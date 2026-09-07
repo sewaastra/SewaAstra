@@ -718,7 +718,7 @@ try {
 const firebaseConfig = {
   apiKey: "AIzaSyCSM2glt8kmV9suOu3O35LxSg9rOg17MQ0",
   authDomain: "sewaastra-85a52.firebaseapp.com",
-  databaseURL: "https://sewaastra-85a52-default-rtdb.firebaseio.com",
+  databaseURL: "https://sewaastra-85a52-sewaastradb-rtdb.firebaseio.com",
   projectId: "sewaastra-85a52",
   storageBucket: "sewaastra-85a52.firebasestorage.app",
   messagingSenderId: "732926932463",

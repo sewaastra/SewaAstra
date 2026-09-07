@@ -165,14 +165,13 @@ window.dataLayer = window.dataLayer || [];
 /* ═══ ब्लॉक 2 ═══ */
 try {
 /* ═══════════════════════════════════════════════════════════════════════
-   🗄️ SWDB — named Firestore database ("sewaastradb")
+   🗄️ SWDB — पूरे ऐप के लिए एक ही Firestore पहुँच
 
-   Firestore का default database "(default)" कहलाता है. यह project उससे
-   अलग एक named database इस्तेमाल करता है — sewaastradb. दोनों बिल्कुल
-   अलग डिब्बे हैं: एक में लिखा दूसरे में दिखता ही नहीं.
+   अभी यह Firestore के default database पर चलता है.
 
-   firebase.firestore() हमेशा "(default)" खोलता है. इसलिए हर जगह
-   SWDB() बुलाया जाता है, जो सही database देता है.
+   पूरा ऐप database सिर्फ़ SWDB() से लेता है, कहीं सीधे firebase.firestore()
+   नहीं लिखा. फ़ायदा: कल किसी named database पर जाना पड़े तो नीचे DB_ID
+   में नाम लिख देना काफ़ी है — 8 जगह ढूँढ-ढूँढकर बदलने की ज़रूरत नहीं.
 
    ⚠️ इसी वजह से SDK 9.6.10 से 10.14.1 पर लाना पड़ा. 9.6.10 का compat
       build named database जानता ही नहीं — उसकी firestore service
@@ -184,18 +183,26 @@ try {
    ═══════════════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
-  var DB_ID = 'sewaastradb';
+  // '' का मतलब Firestore का default database — यही अब इस्तेमाल हो रहा है.
+  // किसी named database पर जाना हो तो बस यहाँ उसका नाम लिख दीजिए,
+  // जैसे 'sewaastradb'. बाक़ी कुछ नहीं बदलना पड़ेगा — पूरा ऐप SWDB() से
+  // ही database लेता है, कहीं सीधे firebase.firestore() नहीं लिखा.
+  //
+  // ⚠️ named database पर जाएँ तो SDK 10 या ऊपर चाहिए. 9.x का compat build
+  //    database का नाम लेता ही नहीं — सब चुपचाप (default) पर चला जाता है
+  //    और कुछ सेव नहीं होता. यह ऐप 10.14.1 पर है, तो दोनों चलेंगे.
+  var DB_ID = '';
   var inst = null;
 
   window.SWDB = function () {
     if (inst) return inst;
     try {
-      inst = firebase.app().firestore(DB_ID);
+      inst = DB_ID ? firebase.app().firestore(DB_ID) : firebase.firestore();
     } catch (e) {
-      // SDK पुराना हो या नाम ग़लत — चुप मत रहो. चुप्पी में यह गड़बड़
-      // "कुछ सेव नहीं हो रहा" बनकर दिखती है और घंटों ढूँढनी पड़ती है.
-      console.error('[SewaAstra] named database "' + DB_ID + '" नहीं खुला — ' +
-                    'SDK 10+ चाहिए. अभी (default) पर चल रहे हैं.', e);
+      // चुप मत रहो. चुप्पी में यह गड़बड़ "कुछ सेव नहीं हो रहा" बनकर
+      // दिखती है और घंटों ढूँढनी पड़ती है.
+      console.error('[SewaAstra] database "' + (DB_ID || '(default)') +
+                    '" नहीं खुला. named DB हो तो SDK 10+ चाहिए.', e);
       inst = firebase.firestore();
     }
     return inst;

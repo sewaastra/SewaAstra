@@ -1,7 +1,5 @@
-/* SewaAstra Customer — सारा JavaScript, मूल क्रम में (50 ब्लॉक)
+/* SewaAstra Customer — सारा JavaScript, मूल क्रम में (52 ब्लॉक)
 
-   ⚠️ क्रम मत बदलिए. सबसे ऊपर security shims (SWXSS/SWID) हैं — वे
-   ⚠️ क्रम मत बदलिए. सबसे ऊपर security shims (SWXSS/SWID) हैं — वे
    ⚠️ क्रम मत बदलिए. सबसे ऊपर security shims (SWXSS/SWID) हैं — वे
       innerHTML जैसे setters को लपेटकर XSS रोकते हैं. अगर उन्हें नीचे
       खिसकाया या हटाया, तो नीचे का सारा code बिना पहरे के चलेगा.
@@ -10,7 +8,7 @@
    कोई ब्लॉक गिरे तो console में साफ़ लिखा आएगा, और window.__SW_ERRORS में
    उसकी गिनती मिल जाएगी.
 
-   (48/50 ब्लॉक लपेटे गए; 2 जान-बूझकर छोड़े गए — कारण वहीं लिखा है.
+   (50/52 ब्लॉक लपेटे गए; 2 जान-बूझकर छोड़े गए — कारण वहीं लिखा है.
     जाँच: acorn)
 */
 
@@ -161,10 +159,53 @@ try {
 window.dataLayer = window.dataLayer || [];
   function gtag(){dataLayer.push(arguments);}
   gtag('js', new Date());
-  gtag('config', 'G-52QKXTC1J4');
+  gtag('config', 'G-YRJ6Q4PSZZ');
 } catch (e) { try { console.error('[SewaAstra] ब्लॉक 1 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([1, String(e)]); } catch (_) {} }
 
 /* ═══ ब्लॉक 2 ═══ */
+try {
+/* ═══════════════════════════════════════════════════════════════════════
+   🗄️ SWDB — named Firestore database ("sewaastradb")
+
+   Firestore का default database "(default)" कहलाता है. यह project उससे
+   अलग एक named database इस्तेमाल करता है — sewaastradb. दोनों बिल्कुल
+   अलग डिब्बे हैं: एक में लिखा दूसरे में दिखता ही नहीं.
+
+   firebase.firestore() हमेशा "(default)" खोलता है. इसलिए हर जगह
+   SWDB() बुलाया जाता है, जो सही database देता है.
+
+   ⚠️ इसी वजह से SDK 9.6.10 से 10.14.1 पर लाना पड़ा. 9.6.10 का compat
+      build named database जानता ही नहीं — उसकी firestore service
+      बनाने वाली factory instanceIdentifier लेती ही नहीं:
+          9.6.10   →  ("firestore", (e, {options:t
+          10.14.1  →  ("firestore", (e, {instanceIdentifier:t, options:
+      यानी पुराने SDK पर 'sewaastradb' लिखने से भी सब चुपचाप (default)
+      पर चला जाता, और वहाँ कुछ न मिलने पर order सेव होते ही नहीं.
+   ═══════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  var DB_ID = 'sewaastradb';
+  var inst = null;
+
+  window.SWDB = function () {
+    if (inst) return inst;
+    try {
+      inst = firebase.app().firestore(DB_ID);
+    } catch (e) {
+      // SDK पुराना हो या नाम ग़लत — चुप मत रहो. चुप्पी में यह गड़बड़
+      // "कुछ सेव नहीं हो रहा" बनकर दिखती है और घंटों ढूँढनी पड़ती है.
+      console.error('[SewaAstra] named database "' + DB_ID + '" नहीं खुला — ' +
+                    'SDK 10+ चाहिए. अभी (default) पर चल रहे हैं.', e);
+      inst = firebase.firestore();
+    }
+    return inst;
+  };
+
+  window.SWDB.id = DB_ID;
+})();
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 2 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([2, String(e)]); } catch (_) {} }
+
+/* ═══ ब्लॉक 3 ═══ */
 try {
 window.__SWID_ROLE = 'customer';
 /* ═══════════════════════════════════════════════════════════════
@@ -347,9 +388,9 @@ window.__SWID_ROLE = 'customer';
     _map: map
   };
 })(window);
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 2 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([2, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 3 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([3, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 3 ═══ */
+/* ═══ ब्लॉक 4 ═══ */
 try {
 (function(){
   'use strict';
@@ -469,9 +510,9 @@ try {
 
   console.log('%c🔒 SewaAstra Security Core active','background:#15a04a;color:#fff;padding:3px 8px;font-weight:bold;border-radius:4px');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 3 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([3, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 4 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([4, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 4 ═══ */
+/* ═══ ब्लॉक 5 ═══ */
 try {
 /* ═══════════════════════════════════════════════════════════════════════
    🛡️ SWGuard — चुराए हुए session से बचाव (client हिस्सा)
@@ -652,7 +693,10 @@ try {
 
   function watch(uid) {
     try {
-      unsub = firebase.firestore().collection('security_sessions').doc(uid)
+      // ⚠️ यहाँ चुप रहना ख़तरनाक है. यह listener ही "तुरंत logout" देता है;
+      //    न जुड़े तो चुराया हुआ session अगले server-ping तक ज़िंदा रहेगा
+      //    और किसी को पता भी नहीं चलेगा. इसलिए गिरे तो शोर मचाओ.
+      unsub = SWDB().collection('security_sessions').doc(uid)
         .onSnapshot(function (snap) {
           var d = snap && snap.exists ? snap.data() : null;
           if (!d) return;
@@ -663,7 +707,11 @@ try {
           // listener टूट गया (rules/नेटवर्क) — server से पूछ लो
           ping(true);
         });
-    } catch (e) {}
+    } catch (e) {
+      try { console.error('[SewaAstra] session listener नहीं जुड़ा — तुरंत ' +
+        'logout वाली सुरक्षा बंद है, सिर्फ़ 60-सेकंड ping बची।', e); } catch (_) {}
+      ping(true);
+    }
   }
 
   function stop() {
@@ -709,22 +757,85 @@ try {
     }
   };
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 4 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([4, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 5 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([5, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 5 ═══ जान-बूझकर नहीं लपेटा: इसके top-level
+/* ═══ ब्लॉक 6 ═══ */
+try {
+/* ═══════════════════════════════════════════════════════════════════════
+   🧾 SWOrder — order अब server बनाता है, client नहीं
+
+   पहले client सीधे  FS.collection('orders').doc(oid).set(order)  करता था.
+   दो दिक़्क़तें थीं:
+
+     1. rules में  allow create: if false  है (और रहना चाहिए), इसलिए हर
+        order चुपचाप रुक जाता था — "ऑर्डर सेव हो रहा है..." पर अटका रहता.
+
+     2. दाम client भेजता था. यानी कोई भी DevTools खोलकर total: 1 भेजकर
+        ₹1 में सेवा बुक कर लेता.
+
+   अब placeOrder callable चलता है. वह catalog server से पढ़कर ख़ुद दाम
+   जोड़ता है, coupon भी server से जाँचता है, और order ID भी वही बनाता है
+   (10^12 जगह + .create(), ताकि दो order टकराएँ नहीं).
+
+   लौटाता है: server वाली order ID.
+   ═══════════════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+  if (window.SWOrder) return;
+
+  window.SWOrder = {
+    place: function (order) {
+      var items = (order.items || []).map(function (i) {
+        return { cat: i.cat || '', n: i.n || '', q: i.qty || 1 };
+      });
+      if (!items.length) return Promise.reject(new Error('Cart खाली है'));
+
+      var loc = order.loc || {};
+      var payload = {
+        items: items,
+        addr: order.address || order.addr || '',
+        mode: order.mode === 'Online' ? 'Online' : 'Cash',
+        remark: order.remark || '',
+        date: order.date || '',
+        time: order.time || '',
+        maps: order.maps || '',
+        paymentMethod: (order.payment && order.payment.method) === 'UPI' ? 'UPI' : 'Cash',
+        coupon: order.coupon || '',
+        lat: loc.lat != null ? loc.lat : null,
+        lng: loc.lon != null ? loc.lon : (loc.lng != null ? loc.lng : null)
+      };
+
+      return firebase.app().functions('asia-south1')
+        .httpsCallable('placeOrder')(payload)
+        .then(function (r) {
+          var d = (r && r.data) || {};
+          if (!d.ok || !d.orderId) throw new Error('server ने order ID नहीं दी');
+          // UI वही दिखाए जो server ने तय किया — वरना ग्राहक को एक रकम
+          // दिखेगी और बिल में दूसरी आएगी.
+          order.id = d.orderId;
+          if (d.total != null) order.total = d.total;
+          if (d.subtotal != null) order.subtotal = d.subtotal;
+          if (d.discount != null) order.discount = d.discount;
+          return d.orderId;
+        });
+    }
+  };
+})();
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 6 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([6, String(e)]); } catch (_) {} }
+
+/* ═══ ब्लॉक 7 ═══ जान-बूझकर नहीं लपेटा: इसके top-level
    let/const दूसरे ब्लॉक इस्तेमाल करते हैं, और try{} के अंदर
    वे इसी ब्लॉक तक सिमट जाते. */
- // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyCSM2glt8kmV9suOu3O35LxSg9rOg17MQ0",
-  authDomain: "sewaastra-85a52.firebaseapp.com",
-  databaseURL: "https://sewaastra-85a52-sewaastradb-rtdb.firebaseio.com",
-  projectId: "sewaastra-85a52",
-  storageBucket: "sewaastra-85a52.firebasestorage.app",
-  messagingSenderId: "732926932463",
-  appId: "1:732926932463:web:d46228294183655ce5b21a",
-  measurementId: "G-YRJ6Q4PSZZ"
-};
+      apiKey: "AIzaSyCSM2glt8kmV9suOu3O35LxSg9rOg17MQ0",
+      authDomain: "sewaastra-85a52.firebaseapp.com",
+      databaseURL: "https://sewaastra-85a52-default-rtdb.firebaseio.com",
+      projectId: "sewaastra-85a52",
+      storageBucket: "sewaastra-85a52.firebasestorage.app",
+      messagingSenderId: "732926932463",
+      appId: "1:732926932463:web:d46228294183655ce5b21a",
+      measurementId: "G-YRJ6Q4PSZZ"
+  };
 
   if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
@@ -732,7 +843,7 @@ const firebaseConfig = {
   }
 
   const db = null; /* RTDB unused - removed for speed */
-  const firestore = firebase.firestore();
+  const firestore = SWDB();
 
   let cart = [];
   let selectedMode = "";
@@ -1549,8 +1660,8 @@ const firebaseConfig = {
 
   function shareApp() {
       if (navigator.share) {
-          navigator.share({ title: 'SewaAstra', text: 'भारत की सबसे भरोसेमंद होम सर्विस ऐप!', url: 'https://sewaastra.github.io/SewaAstra/' });
-      } else { showAlert("शेयर लिंक", "लिंक कॉपी करें: <b>https://sewaastra.github.io/SewaAstra/</b>"); }
+          navigator.share({ title: 'SewaAstra', text: 'भारत की सबसे भरोसेमंद होम सर्विस ऐप!', url: 'https://soorshyamvishwakarma37-cyber.github.io/SewaAstra/' });
+      } else { showAlert("शेयर लिंक", "लिंक कॉपी करें: <b>https://soorshyamvishwakarma37-cyber.github.io/SewaAstra/</b>"); }
   }
 
   function toggleDark() {
@@ -1916,7 +2027,7 @@ const firebaseConfig = {
       }
   };
 
-/* ═══ ब्लॉक 6 ═══ जान-बूझकर नहीं लपेटा: इसके top-level
+/* ═══ ब्लॉक 8 ═══ जान-बूझकर नहीं लपेटा: इसके top-level
    let/const दूसरे ब्लॉक इस्तेमाल करते हैं, और try{} के अंदर
    वे इसी ब्लॉक तक सिमट जाते. */
 /* ═══════════════════════════════════════════════════════════════════
@@ -1932,7 +2043,7 @@ const firebaseConfig = {
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ─────────────── HELPERS ─────────────── */
-const FS = firebase.firestore();
+const FS = SWDB();
 try{ SWID.install(FS); }catch(e){ console.warn('SWID', e); }
 const STATUS_LIST = ['Order Placed', 'Accepted', 'On the Way', 'Working', 'Completed', 'Cancelled'];
 const STATUS_HI = {
@@ -2028,7 +2139,7 @@ window.handleFinalOrder = function () {
   };
 
   showLoader('ऑर्डर सेव हो रहा है...');
-  FS.collection('orders').doc(oid).set(order).then(() => {
+  SWOrder.place(order).then((__id) => { oid = __id;
     hideLoader();
     // offline cache bhi rakho
     let hist = JSON.parse(localStorage.getItem('sw_order_history')) || [];
@@ -2321,7 +2432,7 @@ setTimeout(() => {
 }, 2500);
 console.log('%c SewaAstra PRO Cloud Layer v2.0 active ☁️✅ ', 'background:#ff6b00;color:#fff;font-weight:bold;padding:4px;');
 
-/* ═══ ब्लॉक 7 ═══ */
+/* ═══ ब्लॉक 9 ═══ */
 try {
 /* Premium touch: time-based greeting chip under header */
 (function(){
@@ -2337,9 +2448,9 @@ try {
     }
   }catch(e){}
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 7 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([7, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 9 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([9, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 8 ═══ */
+/* ═══ ब्लॉक 10 ═══ */
 try {
 /* ═══════════════════════════════════════════════════════════════
    SEWAASTRA PRO-MAX LAYER v2.2
@@ -2582,9 +2693,9 @@ window.renderAdminOrders = function (orders) {
 };
 
 console.log('%c SewaAstra PRO-MAX v2.2 ✅ auto-banner | multi-options | REAL tracking ', 'background:#15a04a;color:#fff;font-weight:bold;padding:4px;');
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 8 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([8, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 10 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([10, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 9 ═══ */
+/* ═══ ब्लॉक 11 ═══ */
 try {
 /* SEWAASTRA v23 — History Delete + Ultra Premium Cart */
 
@@ -2690,9 +2801,9 @@ window.showHistory = function(){
 };
 
 console.log('%c SewaAstra v2.3 FINAL ✅ history-delete | ultra cart ', 'background:#0d6efd;color:#fff;font-weight:bold;padding:4px;');
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 9 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([9, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 11 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([11, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 10 ═══ */
+/* ═══ ब्लॉक 12 ═══ */
 try {
 /* ═══════════ SEWAASTRA v24 LAYER ═══════════
    1. Customer profile → Firestore users/{mobile ya gmail}
@@ -2900,9 +3011,9 @@ window.closeSvcOpt = function(){
 })();
 
 console.log('%c SewaAstra v2.4 ✅ fullscreen-admin | users-db | photo-options ', 'background:#7b2ff7;color:#fff;font-weight:bold;padding:4px;');
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 10 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([10, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 12 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([12, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 11 ═══ */
+/* ═══ ब्लॉक 13 ═══ */
 try {
 /* ═══════════ SEWAASTRA v25 — SMART APP INSTALL POPUP ═══════════
    - Har NAYE customer ko login ke turant baad popup
@@ -3007,9 +3118,9 @@ function proMaybeShowPill(){
 }
 
 console.log('%c SewaAstra v2.5 ✅ smart install popup ', 'background:#15a04a;color:#fff;font-weight:bold;padding:4px;');
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 11 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([11, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 13 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([13, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 12 ═══ */
+/* ═══ ब्लॉक 14 ═══ */
 try {
 /* ═══════════ SEWAASTRA v26 ═══════════
    1. Admin panel scroll fix (CSS)
@@ -3163,9 +3274,9 @@ window.adminDeleteOrder = function(oid){
 })();
 
 console.log('%c SewaAstra v2.6 ✅ scroll-fix | auto-rating→partner | admin-delete ', 'background:#f5a623;color:#000;font-weight:bold;padding:4px;');
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 12 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([12, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 14 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([14, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 13 ═══ */
+/* ═══ ब्लॉक 15 ═══ */
 try {
 /* ═══════════ SEWAASTRA v27 — PWA ENGINE ═══════════ */
 (function(){
@@ -3219,9 +3330,9 @@ try {
   });
 })();
 console.log('%c SewaAstra v2.7 ✅ REAL PWA — manifest | sw | offline ', 'background:#ff6b00;color:#fff;font-weight:bold;padding:4px;');
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 13 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([13, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 15 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([15, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 14 ═══ */
+/* ═══ ब्लॉक 16 ═══ */
 try {
 /* ═══════════ SEWAASTRA v28 — SPEED ENGINE ═══════════
    1. Leaflet lazy-load (map khulne par hi download)
@@ -3300,9 +3411,9 @@ if ('requestIdleCallback' in window){
 }
 
 console.log('%c SewaAstra v2.8 ⚡ SPEED ENGINE — lazy leaflet | fast images ', 'background:#e6f7ed;color:#0f7a37;font-weight:bold;padding:4px;');
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 14 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([14, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 16 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([16, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 15 ═══ */
+/* ═══ ब्लॉक 17 ═══ */
 try {
 /* ═══════════ SEWAASTRA v29 MEGA ═══════════
    1. Shimmer skeletons  2. Language engine  3. Coupon celebration
@@ -3690,7 +3801,7 @@ window.handleFinalOrder = function(){
       createdAt: Date.now(), timestamp: new Date().toLocaleString('hi-IN')
     };
     showLoader('ऑर्डर सेव हो रहा है...');
-    FS.collection('orders').doc(oid).set(order).then(function(){
+    SWOrder.place(order).then(function(__id){ oid = __id;
       hideLoader();
       var hist = JSON.parse(localStorage.getItem('sw_order_history')) || [];
       hist.unshift(order);
@@ -3764,9 +3875,9 @@ window.showHistory = function(){
 };
 
 console.log('%c SewaAstra v2.9 🚀 skeleton | i18n | celebration | bill+QR | pay-first ', 'background:#e91e63;color:#fff;font-weight:bold;padding:4px;');
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 15 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([15, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 17 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([17, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 16 ═══ */
+/* ═══ ब्लॉक 18 ═══ */
 try {
 /* ═══════════ SEWAASTRA v32 ═══════════
    1. Admin: Payment Verify button (UTR ke saath)
@@ -3911,9 +4022,9 @@ window.addEventListener('load', function(){
 });
 
 console.log('%c SewaAstra v3.2 ✅ pay-verify | reviews-viewer ', 'background:#b07800;color:#fff;font-weight:bold;padding:4px;');
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 16 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([16, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 18 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([18, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 17 ═══ */
+/* ═══ ब्लॉक 19 ═══ */
 try {
 /* ═══════════ SEWAASTRA v33 — SMART LOCATION ═══════════
    1. Jagah badalte hi header me area ka naam LIVE update
@@ -4032,9 +4143,9 @@ window.addEventListener('load', function(){
 })();
 
 console.log('%c SewaAstra v3.3 📍 live area | auto PIN | extra address ', 'background:#0d6efd;color:#fff;font-weight:bold;padding:4px;');
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 17 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([17, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 19 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([19, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 18 ═══ */
+/* ═══ ब्लॉक 20 ═══ */
 try {
 /* v3.4 — customer ONLINE presence (partner app ko dikhta hai) */
 function proHeartbeat(on){
@@ -4049,9 +4160,9 @@ window.addEventListener('load', function(){ setTimeout(function(){ proHeartbeat(
 setInterval(function(){ if(document.visibilityState==='visible') proHeartbeat(true); }, 45000);
 document.addEventListener('visibilitychange', function(){ proHeartbeat(document.visibilityState==='visible'); });
 window.addEventListener('pagehide', function(){ proHeartbeat(false); });
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 18 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([18, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 20 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([20, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 19 ═══ */
+/* ═══ ब्लॉक 21 ═══ */
 try {
 /* ═══════════ CUSTOMER LOGIN FIX v3.5 ═══════════ */
 function proAuthErr(e){
@@ -4135,9 +4246,9 @@ if (location.protocol === 'file:'){
   }, 2500);
 }
 console.log('%c CUSTOMER LOGIN FIX v3.5 ✅ ', 'background:#e53935;color:#fff;font-weight:bold;');
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 19 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([19, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 21 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([21, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 20 ═══ */
+/* ═══ ब्लॉक 22 ═══ */
 try {
 /* v3.6 removed — REAL login only (OTP / Google). सब data Firebase realtime से। */
 console.log('%c REAL AUTH MODE ✅ (Direct Login removed) ', 'background:#15a04a;color:#fff;font-weight:bold;');
@@ -4222,7 +4333,7 @@ console.log('%c REAL AUTH MODE ✅ (Direct Login removed) ', 'background:#15a04a
       var rec={type:'sos',kind:'emergency',phone:ph,name:nm,uid:uid,msg:m,
         orderId:lastOrder||'',ts:Date.now(),at:new Date().toLocaleString('en-IN'),status:'active'};
       if(loc) rec.loc={lat:loc.lat,lon:loc.lon};
-      firebase.firestore().collection('sos_alerts').add(rec).then(function(d){
+      SWDB().collection('sos_alerts').add(rec).then(function(d){
         window.cSosClose();
         showAlert('🚨 EMERGENCY ALERT भेज दिया गया!','Admin dashboard पर तुरंत 🔴 red alert + sound के साथ दिखेगा। वे आपको तुरंत कॉल करेंगे।<br><br>🆘 बहुत गंभीर हो तो <b>112</b> पर भी कॉल करें।');
         try{ window.open('https://wa.me/917869969190?text='+encodeURIComponent('🚨 SEWAASTRA EMERGENCY\n📱 '+ph+(nm?('\n👤 '+nm):'')+'\n📍 '+(loc?('lat:'+loc.lat+',lon:'+loc.lon):'GPS off')+'\n🗒️ '+SWSec.esc(m)+'\n🧾 Last order: '+(lastOrder||'-')),'_blank'); }catch(e){}
@@ -4242,7 +4353,7 @@ console.log('%c REAL AUTH MODE ✅ (Direct Login removed) ', 'background:#15a04a
     if(m.length<10) return alert('कृपया शिकायत थोड़ा detail में लिखें');
     var btn=document.querySelector('#soSOv .sosSend'); if(btn){ btn.disabled=true; btn.innerText='भेज रहे हैं...'; }
     var cuu=''; try{ cuu=firebase.auth().currentUser?firebase.auth().currentUser.uid:''; }catch(e){}
-    firebase.firestore().collection('tickets').add({
+    SWDB().collection('tickets').add({
       from:'customer', phone:ph, uid:cuu, name:'', cat:'🛒 Customer शिकायत',
       msg:m, status:'Open', ts:Date.now(), at:new Date().toLocaleString('en-IN')
     }).then(function(){
@@ -4341,16 +4452,16 @@ console.log('%c REAL AUTH MODE ✅ (Direct Login removed) ', 'background:#15a04a
     if(!ph){ setTimeout(boot,1500); return; }
     if(watcher) return;
     try{
-      watcher=(SWID.orderQuery(FS,'customer')||firebase.firestore().collection('orders').where('mobile','==',ph).limit(100)).onSnapshot(resolve,function(){ setTimeout(boot,3000); watcher=null; });
+      watcher=(SWID.orderQuery(FS,'customer')||SWDB().collection('orders').where('mobile','==',ph).limit(100)).onSnapshot(resolve,function(){ setTimeout(boot,3000); watcher=null; });
     }catch(e){ setTimeout(boot,2000); }
   }
   setTimeout(boot,900);
   window.addEventListener('load',function(){ setTimeout(boot,1800); });
   console.log('%c 🔐 CUSTOMER v3.8N — COMPLETE OTP + 60s COUNTDOWN ✅ ','background:#8a5a00;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 20 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([20, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 22 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([22, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 21 ═══ */
+/* ═══ ब्लॉक 23 ═══ */
 try {
 /* ═══════════════ CUSTOMER v3.9 — ADMIN BANNERS/NOTICE + BELL + CHAT ALERT DOT ═══════════════ */
 (function(){
@@ -4405,7 +4516,7 @@ try {
   function listen(){
     if(v39L) return; v39L=true;
     try{
-      firebase.firestore().collection('broadcasts').where('active','==',true).limit(30).onSnapshot(function(s){
+      SWDB().collection('broadcasts').where('active','==',true).limit(30).onSnapshot(function(s){
         v39B=s.docs.map(function(d){ var b=d.data(); b._id=d.id; return b; }).filter(function(b){ var t=b.to||'all'; return t==='all'||t==='customer'; }).sort(function(a,b2){ return (b2.ts||0)-(a.ts||0); });
         v39B.forEach(function(b){
           if(!v39Prev[b._id]&&!v39Seen[b._id]){ try{ var t=document.getElementById('welcomeToast'); if(t){ t.innerText='📢 '+em(b)+' '+(b.title||'नया update!'); t.style.display='block'; setTimeout(function(){ t.style.display='none'; },3200); } }catch(e){} }
@@ -4497,9 +4608,9 @@ try {
   window.addEventListener('load',function(){ setTimeout(function(){ try{ mk(); rail(); }catch(e){} },400); });
   console.log('%c 📢🔔💬 CUSTOMER v3.9 — ADMIN BROADCAST + CHAT DOT ✅ ','background:#15a04a;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 21 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([21, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 23 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([23, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 22 ═══ */
+/* ═══ ब्लॉक 24 ═══ */
 try {
 /* ═══════════════ CUSTOMER v4.0 — SUNDER CONFIRM + काम-पूरा 🎉 CELEBRATION + ADMIN EMAIL LOCK ═══════════════ */
 (function(){
@@ -4630,9 +4741,9 @@ try {
   }catch(e){}
   console.log('%c 🎉🔔🔐 CUSTOMER v4.0 — SUNDER + CELEBRATION + ADMIN EMAIL LOCK ✅ ','background:#15a04a;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 22 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([22, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 24 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([24, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 23 ═══ */
+/* ═══ ब्लॉक 25 ═══ */
 try {
 /* ═══════════════ CUSTOMER v4.0B — सारे confirm → SUNDER box ═══════════════ */
 (function(){
@@ -4721,9 +4832,9 @@ try {
   };
   console.log('%c 🔔 CUSTOMER v4.0B — ALL CONFIRMS SUNDER ✅ ','background:#1976d2;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 23 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([23, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 25 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([25, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 24 ═══ */
+/* ═══ ब्लॉक 26 ═══ */
 try {
 /* सभी native alert() → SUNDER (Customer) */
 (function(){
@@ -4733,9 +4844,9 @@ try {
   };
   console.log('%c 🔔 CUSTOMER v4.0C — ALERT SUNDER ✅ ','background:#ff6b00;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 24 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([24, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 26 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([26, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 25 ═══ */
+/* ═══ ब्लॉक 27 ═══ */
 try {
 /* ═══════════════ CUSTOMER v4.2 — URBAN-STYLE ITEM DETAIL (photo + rate + qty + add) ═══════════════ */
 (function(){
@@ -4871,9 +4982,9 @@ try {
   bindModalAdd();
   console.log('%c 🛒 CUSTOMER v4.2 — ITEM PHOTO+RATE+QTY MODAL ✅ ','background:#ff6b00;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 25 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([25, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 27 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([27, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 26 ═══ */
+/* ═══ ब्लॉक 28 ═══ */
 try {
 /* ═══════════════ CUSTOMER v4.3 — PARTNER VISIT MOVING POPUP + WORK-EDIT OTP ═══════════════ */
 (function(){
@@ -4977,9 +5088,9 @@ try {
   setTimeout(function(){ try{ watcher(); editWatch(); }catch(e){} },6000);
   console.log('%c 🧑‍🔧 CUSTOMER v4.3 — VISIT POPUP + EDIT OTP ✅ ','background:#0d47a1;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 26 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([26, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 28 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([28, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 27 ═══ */
+/* ═══ ब्लॉक 29 ═══ */
 try {
 /* ═══════════════ CUSTOMER v4.4 — LIVE WALLET(SW ₹) + COINS + REFER ₹1000-COIN + SERVICE RATING + EDIT-POPUP ═══════════════ */
 (function(){
@@ -5366,7 +5477,7 @@ try {
         createdAt:Date.now(), timestamp:new Date().toLocaleString('hi-IN')
       };
       showLoader('ऑर्डर सेव हो रहा है...');
-      FS.collection('orders').doc(oid).set(order).then(function(){
+      SWOrder.place(order).then(function(__id){ oid = __id;
         hideLoader();
         /* wallet/coins deduct */
         try{ wDeduct(oid,swU,coU); }catch(e){}
@@ -5511,9 +5622,9 @@ try {
 
   console.log('%c 💰🪙⭐ CUSTOMER v4.4 — WALLET + COINS + REFER + SERVICE RATING + EDIT-POPUP ✅ ','background:#0d47a1;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 27 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([27, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 29 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([29, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 28 ═══ */
+/* ═══ ब्लॉक 30 ═══ */
 try {
 /* ═══════════════ CUSTOMER v4.6 — 🌐 GOOGLE TRANSLATE (A–Z पूरी App) + ⚡ 5-sec AUTO REFRESH (data reset नहीं) ═══════════════ */
 (function(){
@@ -5615,9 +5726,9 @@ var LGS=[['hi','हिन्दी'],['en','English']];
   setTimeout(function(){ try{ FS.collection('app_config').doc('main').get().then(function(d){ if(d.exists) window.__cfgT=Number((d.data().updatedAt)||0); }).catch(function(){}); }catch(e){} },3000);
   console.log('%c 🌐⚡ CUSTOMER v4.6 — GOOGLE TRANSLATE + AUTO REFRESH ✅ ','background:#0d47a1;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 28 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([28, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 30 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([30, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 29 ═══ */
+/* ═══ ब्लॉक 31 ═══ */
 try {
 /* ═══════════════ CUSTOMER v4.7 — REAL FULL-APP TRANSLATE + ORIGINAL COMPANY BILL (SewaAstra Steel Pvt Ltd) + SOS CLOSE ═══════════════ */
 (function(){
@@ -5934,9 +6045,9 @@ var LGS=[['hi','हिन्दी'],['en','English']];
 
   console.log('%c 🌐🧾🆘 CUSTOMER v4.7 — REAL TRANSLATE + ORIGINAL BILL + SOS CLOSE ✅ ','background:#0d47a1;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 29 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([29, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 31 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([31, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 30 ═══ */
+/* ═══ ब्लॉक 32 ═══ */
 try {
 /* ═══════════════ CUSTOMER v4.8 — LANGUAGE 1-at-a-time + PROFILE-only + DELETE BOX ═══════════════ */
 (function(){
@@ -6000,9 +6111,9 @@ try {
   }catch(e){}
   console.log('%c 🌐🗑️ CUSTOMER v4.8 — LANG 1× + DELETE BOX ✅ ','background:#6a1b9a;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 30 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([30, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 32 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([32, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 31 ═══ */
+/* ═══ ब्लॉक 33 ═══ */
 try {
 /* ═══════════════ CUSTOMER v4.9 — 🏙️ CITY CHANGE OPTION (Profile) ═══════════════ */
 (function(){
@@ -6052,9 +6163,9 @@ try {
   setTimeout(row,4500);
   console.log('%c 🏙️ CUSTOMER v4.9 — CITY CHANGE ✅ ','background:#0d47a1;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 31 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([31, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 33 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([33, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 32 ═══ */
+/* ═══ ब्लॉक 34 ═══ */
 try {
 /* ═══════════════ CUSTOMER v5.0 — 🛒 CART REFRESH-SAFE (localStorage) — refresh par data reset नहीं ═══════════════ */
 (function(){
@@ -6085,9 +6196,9 @@ try {
   setTimeout(window.cartRestore,4000);
   console.log('%c 🛒 CUSTOMER v5.0 — CART REFRESH-SAFE ✅ ','background:#0d47a1;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 32 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([32, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 34 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([34, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 33 ═══ */
+/* ═══ ब्लॉक 35 ═══ */
 try {
 (function(){
   if(window.__swEmailAuth7) return; window.__swEmailAuth7=1;
@@ -6164,9 +6275,9 @@ try {
   window.sendRealPhoneOTP=noOTP; window.verifyRealPhoneOTP=noOTP; window.resetAuth=noOTP;
   console.log('%c ✉️ EMAIL+PASSWORD LOGIN v7.0 (mobile OTP removed) ','background:#0d47a1;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 33 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([33, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 35 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([35, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 34 ═══ */
+/* ═══ ब्लॉक 36 ═══ */
 try {
 /* ═══ SewaAstra v9 — KHUD KI Masked Calling (WebRTC voice, number kabhi nahi dikhta) ═══ */
 (function(){
@@ -6321,9 +6432,9 @@ waitT=setTimeout(function(){ if(st.s==='ringin'&&st.oid===oid){ try{ callDoc(oid
 window.SWAgora={ APP:'SWA-OWN-v9', init:function(r){ try{ if(r) ROLE=(r==='partner')?'partner':'cust'; }catch(e){} try{ ensureUI(); }catch(e){} try{ document.addEventListener('click',function(){ try{ ac(); }catch(e){} },{once:true}); }catch(e){} setTimeout(function(){ try{ watchMine(); }catch(e){} },1200); try{ firebase.auth().onAuthStateChanged(function(){ setTimeout(function(){ try{ watchMine(); }catch(e){} },900); }); }catch(e){} setInterval(function(){ try{ watchMine(); }catch(e){} },60000); }, dial:dial, hangup:function(){ if(st.s!=='idle') endCall('कॉल समाप्त',''); }, state:function(){ return st.s; } };
 console.log('%c 🔒 OWN MASKED CALL v9 (WebRTC, full-screen + vibrate/sound) ','background:#15a04a;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 34 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([34, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 36 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([36, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 35 ═══ */
+/* ═══ ब्लॉक 37 ═══ */
 try {
 (function(){ try{
 window.openMaskCall=function(oid){
@@ -6344,9 +6455,9 @@ try{ if(window.showToast) window.showToast('पहले कोई active ऑर
 };
 SWAgora.init('cust');
 }catch(e){ console.log('swcall',e); } })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 35 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([35, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 37 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([37, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 36 ═══ */
+/* ═══ ब्लॉक 38 ═══ */
 try {
 /* SewaAstra — in-app Policy / Terms / About (bina exit confirm) v8.2 */
 (function(){
@@ -6412,9 +6523,9 @@ try {
   }catch(e){}
   console.log('%c 📄 IN-APP Policy/About/Terms v8.2 ','background:#0d6efd;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 36 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([36, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 38 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([38, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 37 ═══ */
+/* ═══ ब्लॉक 39 ═══ */
 try {
 /* ═══════════════════════════════════════════════════════════════
    SEWAASTRA — SUNDER POPUP SYSTEM v8.3
@@ -6506,9 +6617,9 @@ try {
   };
   console.log('%c 💎 SUNDER POPUPS v8.3 ','background:linear-gradient(90deg,#ff2d95,#7a2bff);color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 37 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([37, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 39 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([39, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 38 ═══ */
+/* ═══ ब्लॉक 40 ═══ */
 try {
 /* Native overrides — har alert/confirm/prompt ab sunder in-app popup */
 (function(){
@@ -6519,9 +6630,9 @@ try {
   window.confirm=function(){ return false; };   /* conversions swUi.confirm use karte hain */
   window.prompt=function(){ return null; };
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 38 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([38, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 40 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([40, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 39 ═══ */
+/* ═══ ब्लॉक 41 ═══ */
 try {
 /* ═══════════════════════════════════════════════════════════════
    SEWAASTRA — EXIT GUARD v8.2 (teeno apps) — सुंदर confirm popup
@@ -6652,9 +6763,9 @@ try {
   try{ trap(); }catch(e){}
   console.log('%c 🚪 EXIT GUARD v8.2 — kahi se bhi exit confirm popup ✅ ','background:linear-gradient(90deg,#e53935,#7a2bff);color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 39 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([39, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 41 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([41, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 40 ═══ */
+/* ═══ ब्लॉक 42 ═══ */
 try {
 /* ═══ v9 — CHAT NOTIFICATION (sound + vibrate + popup) — customer ═══ */
 (function(){
@@ -6699,9 +6810,9 @@ setInterval(scan,7000);
 setTimeout(scan,5000);
 console.log('%c 💬 CHAT NOTIFY v9 (sound+vibrate) ','background:#0d6efd;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 40 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([40, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 42 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([42, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 41 ═══ */
+/* ═══ ब्लॉक 43 ═══ */
 try {
 /* ═══ v10 — SUNDER MIC PERMISSION BOX (dono apps) ═══ */
 (function(){
@@ -6753,9 +6864,9 @@ try{ window.swAskMic(function(){ _dial.apply(self,a); }); }catch(e){ return _dia
 setTimeout(function(){ try{ var asked=false; try{ asked=!!localStorage.getItem('sw_mic_asked'); }catch(e){} if(!asked&&!granted()) window.swAskMic(null); }catch(e){} },6000);
 console.log('%c 🎤 MIC PERMISSION BOX v10 ','background:#7a2bff;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 41 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([41, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 43 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([43, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 42 ═══ */
+/* ═══ ब्लॉक 44 ═══ */
 try {
 /* ═══ v10 — LIVE sync badge (refresh ki jarurat nahi) ═══ */
 (function(){
@@ -6767,9 +6878,9 @@ function upd(){ try{ b.innerHTML=navigator.onLine?'⚡ Live':'📴 Offline'; b.s
 window.addEventListener('online',upd); window.addEventListener('offline',upd); upd();
 }catch(e){}
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 42 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([42, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 44 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([44, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 43 ═══ */
+/* ═══ ब्लॉक 45 ═══ */
 try {
 /* ═══ v10 — RED DOT on Live Chat (customer) + instant listener ═══ */
 (function(){
@@ -6816,9 +6927,9 @@ Object.keys(subs).forEach(function(k){ if(!ids[k]){ try{ subs[k](); }catch(e){} 
 setInterval(ensure,9000); setTimeout(ensure,4000);
 setInterval(paintDots,3000);
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 43 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([43, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 45 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([45, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 44 ═══ */
+/* ═══ ब्लॉक 46 ═══ */
 try {
 /* ═══ v10 — Customer OTP popup par sound+vibrate (dhyaan jaye turant) ═══ */
 (function(){
@@ -6838,9 +6949,9 @@ if(nd&&nd.id==='wOtpBar'){ beep3(); vib([200,100,200,100,400]); try{ if(window.s
 mo.observe(document.body,{childList:true,subtree:false});
 }catch(e){}
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 44 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([44, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 46 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([46, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 45 ═══ */
+/* ═══ ब्लॉक 47 ═══ */
 try {
 /* ═══ v12 — 📲 APP INSTALL button (home-screen) — customer ═══ */
 (function(){
@@ -6871,9 +6982,9 @@ dl();
 };
 console.log('%c ⬇️ DOWNLOAD APP v12 (customer) ','background:#15a04a;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 45 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([45, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 47 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([47, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 46 ═══ */
+/* ═══ ब्लॉक 48 ═══ */
 try {
 /* ═══ v13 — SETTINGS me bada ⬇️ Download App button (customer) ═══ */
 (function(){
@@ -6894,9 +7005,9 @@ if(host.parentNode) host.parentNode.insertBefore(d,host.nextSibling);
 }
 setInterval(add,2500); setTimeout(add,1500);
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 46 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([46, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 48 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([48, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 47 ═══ */
+/* ═══ ब्लॉक 49 ═══ */
 try {
 /* ═══ v17 — BROWSER = FULL APP (koi browser-nishan nahi) ═══ */
 (function(){
@@ -6929,9 +7040,9 @@ el=el.parentNode;
 }catch(e){}
 console.log('%c 📱 APP-FEEL v17 (browser hi app hai) ','background:#0d6efd;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 47 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([47, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 49 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([49, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 48 ═══ */
+/* ═══ ब्लॉक 50 ═══ */
 try {
 /* ═══ v20 — ONE-FINGER SCROLL GUARANTEE (native + manual backup) ═══ */
 (function(){
@@ -6980,9 +7091,9 @@ document.addEventListener('touchend',function(){ down=false; var g=on; on=false;
 document.addEventListener('touchcancel',function(){ down=false; on=false; try{ stopGlide(); }catch(e){} },{passive:true});
 console.log('%c 👆 FAST SCROLL v21 ','background:#15a04a;color:#fff;font-weight:bold;padding:3px;');
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 48 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([48, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 50 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([50, String(e)]); } catch (_) {} }
 
-/* ═══ ब्लॉक 49 ═══ */
+/* ═══ ब्लॉक 51 ═══ */
 try {
 /* ═══ v21 — 3 SECOND AUTO SYNC (bina dikhe, bina net-ghehra) — customer ═══ */
 (function(){
@@ -6993,4 +7104,4 @@ try{ var b=document.getElementById('swLiveB'); if(b){ var on=navigator.onLine; b
 try{ var h=document.getElementById('swDotH'); }catch(e){} try{ var __nt=Date.now(); if(!__swOrdT||__nt-__swOrdT>60000){ __swOrdT=__nt; if(localStorage.getItem('sw_logged')==='true'&&typeof startMyOrdersListener==='function'){ startMyOrdersListener(); } } }catch(e){}
 },3000);
 })();
-} catch (e) { try { console.error('[SewaAstra] ब्लॉक 49 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([49, String(e)]); } catch (_) {} }
+} catch (e) { try { console.error('[SewaAstra] ब्लॉक 51 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([51, String(e)]); } catch (_) {} }

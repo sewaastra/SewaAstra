@@ -714,15 +714,17 @@ try {
 /* ═══ ब्लॉक 5 ═══ जान-बूझकर नहीं लपेटा: इसके top-level
    let/const दूसरे ब्लॉक इस्तेमाल करते हैं, और try{} के अंदर
    वे इसी ब्लॉक तक सिमट जाते. */
+ // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-      apiKey: "AIzaSyA4kInzUxzF6Or1sHfzXavx1nVM0x40lak",
-      authDomain: "sewaastra.firebaseapp.com",
-      projectId: "sewaastra",
-      storageBucket: "sewaastra.firebasestorage.app",
-      messagingSenderId: "211091351218",
-      appId: "1:211091351218:web:5602f5f1a36a21c3464bab",
-      measurementId: "G-52QKXTC1J4"
-  };
+  apiKey: "AIzaSyCSM2glt8kmV9suOu3O35LxSg9rOg17MQ0",
+  authDomain: "sewaastra-85a52.firebaseapp.com",
+  databaseURL: "https://sewaastra-85a52-default-rtdb.firebaseio.com",
+  projectId: "sewaastra-85a52",
+  storageBucket: "sewaastra-85a52.firebasestorage.app",
+  messagingSenderId: "732926932463",
+  appId: "1:732926932463:web:d46228294183655ce5b21a",
+  measurementId: "G-YRJ6Q4PSZZ"
+};
 
   if (!firebase.apps.length) {
       firebase.initializeApp(firebaseConfig);
@@ -1547,8 +1549,8 @@ const firebaseConfig = {
 
   function shareApp() {
       if (navigator.share) {
-          navigator.share({ title: 'SewaAstra', text: 'भारत की सबसे भरोसेमंद होम सर्विस ऐप!', url: 'https://soorshyamvishwakarma37-cyber.github.io/SewaAstra/' });
-      } else { showAlert("शेयर लिंक", "लिंक कॉपी करें: <b>https://soorshyamvishwakarma37-cyber.github.io/SewaAstra/</b>"); }
+          navigator.share({ title: 'SewaAstra', text: 'भारत की सबसे भरोसेमंद होम सर्विस ऐप!', url: 'https://sewaastra.github.io/SewaAstra/' });
+      } else { showAlert("शेयर लिंक", "लिंक कॉपी करें: <b>https://sewaastra.github.io/SewaAstra/</b>"); }
   }
 
   function toggleDark() {

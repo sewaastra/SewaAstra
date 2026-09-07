@@ -780,52 +780,139 @@ try {
      2. दाम client भेजता था. यानी कोई भी DevTools खोलकर total: 1 भेजकर
         ₹1 में सेवा बुक कर लेता.
 
-   अब placeOrder callable चलता है. वह catalog server से पढ़कर ख़ुद दाम
-   जोड़ता है, coupon भी server से जाँचता है, और order ID भी वही बनाता है
-   (10^12 जगह + .create(), ताकि दो order टकराएँ नहीं).
+   दो रास्ते हैं, इसी क्रम में:
 
-   लौटाता है: server वाली order ID.
+     1. placeOrder Cloud Function — पसंदीदा. catalog server से पढ़कर ख़ुद
+        दाम जोड़ता है, इसलिए client झूठा दाम भेज ही नहीं सकता.
+
+     2. सीधे Firestore — तब, जब function न पहुँचे (deploy न हो, नेटवर्क
+        अटके, 8 सेकंड में जवाब न आए). ऐप चलता रहे, यही मक़सद.
+
+   ⚠️ दूसरे रास्ते में दाम client भेजता है. rules बाक़ी सब जाँचती हैं —
+      अपना uid हो, status सही हो, partner ख़ुद न चुना हो — पर दाम catalog
+      से मिलाकर नहीं देख सकतीं. इसलिए functions deploy होते ही
+      firestore.rules में CLIENT_ORDER_CREATE() को false कर दीजिए.
+
+   लौटाता है: order ID (जिस भी रास्ते से बनी).
    ═══════════════════════════════════════════════════════════════════════ */
 (function () {
   'use strict';
   if (window.SWOrder) return;
 
-  window.SWOrder = {
-    place: function (order) {
-      var items = (order.items || []).map(function (i) {
-        return { cat: i.cat || '', n: i.n || '', q: i.qty || 1 };
-      });
-      if (!items.length) return Promise.reject(new Error('Cart खाली है'));
+  // function न चले तो कितनी देर इंतज़ार करें. इससे ज़्यादा रुकने पर
+  // ग्राहक को लगता है ऐप अटक गया और वह बटन बार-बार दबाने लगता है.
+  var FN_TIMEOUT_MS = 8000;
 
-      var loc = order.loc || {};
-      var payload = {
-        items: items,
-        addr: order.address || order.addr || '',
-        mode: order.mode === 'Online' ? 'Online' : 'Cash',
-        remark: order.remark || '',
-        date: order.date || '',
-        time: order.time || '',
-        maps: order.maps || '',
-        paymentMethod: (order.payment && order.payment.method) === 'UPI' ? 'UPI' : 'Cash',
-        coupon: order.coupon || '',
-        lat: loc.lat != null ? loc.lat : null,
-        lng: loc.lon != null ? loc.lon : (loc.lng != null ? loc.lng : null)
-      };
+  function viaFunction(order) {
+    var items = (order.items || []).map(function (i) {
+      return { cat: i.cat || '', n: i.n || '', q: i.qty || 1 };
+    });
+    var loc = order.loc || {};
+    var payload = {
+      items: items,
+      addr: order.address || order.addr || '',
+      mode: order.mode === 'Online' ? 'Online' : 'Cash',
+      remark: order.remark || '', date: order.date || '', time: order.time || '',
+      maps: order.maps || '', coupon: order.coupon || '',
+      paymentMethod: (order.payment && order.payment.method) === 'UPI' ? 'UPI' : 'Cash',
+      lat: loc.lat != null ? loc.lat : null,
+      lng: loc.lon != null ? loc.lon : (loc.lng != null ? loc.lng : null)
+    };
 
-      return firebase.app().functions('asia-south1')
-        .httpsCallable('placeOrder')(payload)
-        .then(function (r) {
-          var d = (r && r.data) || {};
-          if (!d.ok || !d.orderId) throw new Error('server ने order ID नहीं दी');
-          // UI वही दिखाए जो server ने तय किया — वरना ग्राहक को एक रकम
-          // दिखेगी और बिल में दूसरी आएगी.
-          order.id = d.orderId;
-          if (d.total != null) order.total = d.total;
-          if (d.subtotal != null) order.subtotal = d.subtotal;
-          if (d.discount != null) order.discount = d.discount;
-          return d.orderId;
+    var call = firebase.app().functions('asia-south1')
+      .httpsCallable('placeOrder')(payload);
+
+    // callable अपने आप timeout नहीं करता — नेटवर्क अटका तो हमेशा लटका रहेगा
+    var timeout = new Promise(function (_, rej) {
+      setTimeout(function () { rej(new Error('TIMEOUT')); }, FN_TIMEOUT_MS);
+    });
+
+    return Promise.race([call, timeout]).then(function (r) {
+      var d = (r && r.data) || {};
+      if (!d.ok || !d.orderId) throw new Error('server ने order ID नहीं दी');
+      // UI वही दिखाए जो server ने तय किया, वरना ग्राहक को एक रकम दिखेगी
+      // और बिल में दूसरी आएगी
+      order.id = d.orderId;
+      if (d.total != null)    order.total = d.total;
+      if (d.subtotal != null) order.subtotal = d.subtotal;
+      if (d.discount != null) order.discount = d.discount;
+      return d.orderId;
+    });
+  }
+
+  function viaFirestore(order) {
+    // ID बड़ी रखी है. छोटी ID पर दो ग्राहकों की एक ही ID बन जाने का
+    // ख़तरा असल में होता है, और .set() तब पुराना order चुपचाप मिटा देता.
+    // इसलिए 12 अंक + .create() — जो पहले से हो तो लिखने से मना कर दे.
+    function newId() {
+      var a = String(Math.floor(Math.random() * 1e6));
+      var b = String(Math.floor(Math.random() * 1e6));
+      return 'SW' + ('000000' + a).slice(-6) + ('000000' + b).slice(-6);
+    }
+
+    function attempt(bache) {
+      var oid = newId();
+      var body = {};
+      // rules की allowlist से बाहर का कोई field भेजा तो पूरा write गिर
+      // जाता है — इसलिए वही भेजो जो rules में लिखा है.
+      var OK = ['uid','mobile','items','cats','subtotal','discount','total',
+                'address','addr','date','time','remark','mode','maps','loc',
+                'lat','lng','status','rated','payment','coupon','createdAt',
+                'timestamp','pincode','city'];
+      OK.forEach(function (k) { if (order[k] !== undefined) body[k] = order[k]; });
+      body.id = oid;
+      body.status = 'Order Placed';
+      body.rated = false;
+      if (body.payment) body.payment.verified = false;
+      if (!body.createdAt) body.createdAt = Date.now();
+
+      return SWDB().collection('orders').doc(oid).create(body)
+        .then(function () { order.id = oid; return oid; })
+        .catch(function (e) {
+          // 6 = ALREADY_EXISTS — ID टकरा गई, नई लेकर फिर कोशिश
+          var already = e && (e.code === 6 || e.code === 'already-exists');
+          if (already && bache > 0) return attempt(bache - 1);
+          throw e;
         });
     }
+    return attempt(5);
+  }
+
+  // ⚠️ Cloud Functions सिर्फ़ Blaze (pay-as-you-go) plan पर deploy होते हैं.
+  //    Spark (मुफ़्त) plan पर `firebase deploy --only functions` चलता ही
+  //    नहीं. इसलिए default में यह बंद है — order सीधे Firestore में जाता
+  //    है और ऐप बिना किसी अतिरिक्त सेटअप के चलता है.
+  //
+  //    Blaze पर हों और functions deploy कर दिए हों, तो इसे true कर दीजिए.
+  //    तब दाम server तय करेगा (ज़्यादा सुरक्षित), और उसके बाद
+  //    firestore.rules में CLIENT_ORDER_CREATE() को false कर दीजिए.
+  window.SW_USE_FUNCTIONS = false;
+
+  // function एक बार नाकाम हो जाए तो हर order पर 8 सेकंड इंतज़ार करने का
+  // कोई मतलब नहीं — याद रखो और सीधे Firestore पर जाओ.
+  var fnNakaam = false;
+
+  window.SWOrder = {
+    place: function (order) {
+      if (!(order.items || []).length) return Promise.reject(new Error('Cart खाली है'));
+
+      if (!window.SW_USE_FUNCTIONS || fnNakaam) return viaFirestore(order);
+
+      return viaFunction(order).catch(function (e) {
+        fnNakaam = true;
+        // function न पहुँचे तो ऐप रुकना नहीं चाहिए — सीधे Firestore में
+        // लिख दो. rules वहाँ भी जाँच करती हैं (अपना uid, सही status,
+        // partner ख़ुद न चुनना, आदि), बस दाम की जाँच नहीं हो पाती.
+        console.warn('[SewaAstra] placeOrder नहीं चला, सीधे Firestore में ' +
+                     'लिख रहे हैं। दाम की server-जाँच इस रास्ते में नहीं ' +
+                     'होती — functions deploy कीजिए।', e && e.message);
+        return viaFirestore(order);
+      });
+    },
+
+    // जाँच के लिए: कौन सा रास्ता चला
+    _viaFunction: viaFunction,
+    _viaFirestore: viaFirestore
   };
 })();
 } catch (e) { try { console.error('[SewaAstra] ब्लॉक 6 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([6, String(e)]); } catch (_) {} }

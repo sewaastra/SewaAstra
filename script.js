@@ -811,10 +811,10 @@ try {
     var payload = {
       items: items,
       addr: order.address || order.addr || '',
-      mode: order.mode === 'Online' ? 'Online' : 'Cash',
+      mode: 'Online',
       remark: order.remark || '', date: order.date || '', time: order.time || '',
       maps: order.maps || '', coupon: order.coupon || '',
-      paymentMethod: (order.payment && order.payment.method) === 'UPI' ? 'UPI' : 'Cash',
+      paymentMethod: 'Razorpay',
       lat: loc.lat != null ? loc.lat : null,
       lng: loc.lon != null ? loc.lon : (loc.lng != null ? loc.lng : null)
     };
@@ -1881,11 +1881,14 @@ const firebaseConfig = {
   }
 
   function setPayMode(mode) {
-      selectedMode = mode;
-      document.getElementById('payCash').style.borderColor = mode === 'Cash' ? 'var(--primary)' : '#ddd';
-      document.getElementById('payCash').style.background = mode === 'Cash' ? 'var(--primary-light)' : 'var(--card-bg)';
-      document.getElementById('payOnline').style.borderColor = mode === 'Online' ? 'var(--primary)' : '#ddd';
-      document.getElementById('payOnline').style.background = mode === 'Online' ? 'var(--primary-light)' : 'var(--card-bg)';
+      /* SewaAstra now accepts Razorpay only. */
+      selectedMode = 'Online';
+      var online = document.getElementById('payOnline');
+      if (online) {
+          online.style.borderColor = 'var(--primary)';
+          online.style.background = 'var(--primary-light)';
+          online.innerText = '💳 केवल Razorpay से भुगतान';
+      }
   }
 
   function handleFinalOrder() {
@@ -2177,7 +2180,7 @@ function proEsc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&a
 function getUID() { try { return firebase.auth().currentUser ? firebase.auth().currentUser.uid : null; } catch (e) { return null; } }
 function getIdent() { return localStorage.getItem('sw_user') || ''; }
 function isAdminUser(){ /* 🔒 C-1: अब सिर्फ Firebase custom claim — localStorage नहीं */ try{ return !!(window.SWSec && window.SWSec.isAdmin); }catch(e){ return false; } }
-let CLOUD_CONFIG = {};   // {upiId, ...}
+let CLOUD_CONFIG = {};   // shared non-payment configuration only
 let myOrdersCache = {};  // id -> status (notification diff ke liye)
 let unsubMyOrders = null, unsubAllOrders = null, unsubChat = null;
 let activeChatOrderId = null;
@@ -2189,7 +2192,6 @@ function pushConfigToCloud() {
     mainData: JSON.stringify(mainData),
     bannersData: JSON.stringify(bannersData),
     couponsData: JSON.stringify(couponsData),
-    upiId: CLOUD_CONFIG.upiId || '',
     updatedAt: Date.now()
   };
   FS.collection('app_config').doc('main').set(payload, { merge: true })
@@ -2203,7 +2205,6 @@ function applyCloudConfig(d) {
     if (d.mainData) { mainData = JSON.parse(d.mainData); localStorage.setItem('sw_custom_services', d.mainData); }
     if (d.bannersData) { bannersData = JSON.parse(d.bannersData); localStorage.setItem('sw_custom_banners', d.bannersData); }
     if (d.couponsData) { couponsData = JSON.parse(d.couponsData); localStorage.setItem('sw_custom_coupons', d.couponsData); }
-    CLOUD_CONFIG.upiId = d.upiId || '';
     try { renderCategoriesGrid(); } catch (e) {}
     try { renderBanners(); } catch (e) {}
     try { renderMoreCategoriesGrid(); } catch (e) {}
@@ -2445,10 +2446,6 @@ function injectAdminOrdersTab() {
   sec.style.display = 'none';
   sec.innerHTML = `
     <div id="admOrderStats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;"></div>
-    <div style="display:flex;gap:6px;margin-bottom:10px;">
-      <input id="admUpiId" placeholder="अपनी UPI ID (online payment के लिए)" style="flex:1;border:1px solid #ddd;border-radius:8px;padding:8px;font-size:12px;">
-      <button onclick="saveAdminUpi()" style="background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:bold;cursor:pointer;">Save</button>
-    </div>
     <div id="admOrdersList" style="max-height:55vh;overflow-y:auto;">Loading...</div>`;
   modalBody.appendChild(sec);
 }
@@ -2466,7 +2463,7 @@ window.switchAdminTab = function (tab) {
     document.getElementById('admTabServBtn').style.background = 'transparent';
     document.getElementById('admTabServBtn').style.color = '#555';
     startAllOrdersListener();
-    document.getElementById('admUpiId').value = CLOUD_CONFIG.upiId || '';
+    /* Manual UPI settings removed: all checkout payments use Razorpay. */
   } else {
     if (sec) sec.style.display = 'none';
     if (btn) { btn.style.background = 'transparent'; btn.style.color = '#555'; }
@@ -2474,10 +2471,7 @@ window.switchAdminTab = function (tab) {
   }
 };
 
-window.saveAdminUpi = function () {
-  CLOUD_CONFIG.upiId = document.getElementById('admUpiId').value.trim();
-  pushConfigToCloud();
-};
+/* Manual UPI configuration removed. Razorpay is the only checkout gateway. */
 
 function startAllOrdersListener() {
   /* SCALE: पूरी orders collection नहीं — LIVE active + हाल के 150 (bounded) */
@@ -6021,7 +6015,6 @@ var LGS=[['hi','हिन्दी'],['en','English']];
     var cfg=(o._cfg)||{};
     var gstPct=Math.max(0,Number(cfg.gstPct)||0);
     var paid=!!(o.payment&&(o.payment.verified||/^paid/i.test(o.payment.status||'')));
-    var isCash=/cash|cod|नकद/i.test(o.mode||'');
     var sub=Number(o.subtotal)||(o.items||[]).reduce(function(s,it){ return s+(Number(it.p)||0)*(it.qty||1); },0);
     var disc=Number(o.discount)||0;
     var base=Math.max(0,sub-disc);
@@ -6038,14 +6031,8 @@ var LGS=[['hi','हिन्दी'],['en','English']];
     if(!m){ document.body.insertAdjacentHTML('beforeend','<div id="proBillModal" onclick="if(event.target===this)proCloseBill()"><div class="pro-bill" id="proBillInner"></div></div>'); m=document.getElementById('proBillModal'); }
     var payB='';
     var payAct='';
-    if(paid) payB='<div style="text-align:center;background:#e6f7ed;border:1px solid #a8e6c2;border-radius:12px;padding:10px;margin-top:10px;font-weight:900;color:#0f7a37;font-size:12.5px;">✅ PAID'+(o.payment&&o.payment.ref?('<br><span style="font-size:10px;">Ref: '+proEsc(o.payment.ref)+'</span>'):'')+'</div>';
-    else {
-      if(isCash) payB='<div style="text-align:center;background:#fff6e0;border:1px solid #ffd970;border-radius:12px;padding:10px;margin-top:10px;font-weight:900;color:#8a6100;font-size:12.5px;">💵 CASH (COD) — service के बाद partner को दें</div>';
-      else { payB='<div style="text-align:center;background:#fff6e0;border:1px solid #ffd970;border-radius:12px;padding:10px;margin-top:10px;font-weight:900;color:#8a6100;font-size:12.5px;">⏳ PAYMENT DUE — नीचे से pay करें</div>';
-        payAct='<div style="text-align:center;margin-top:10px;"><div style="font-size:12px;font-weight:900;color:#ff6b00;">📲 UPI/QR से भुगतान करें</div><div id="proQrBox" style="display:flex;justify-content:center;"></div><div style="font-size:11px;color:#888;">UPI ID: <b>'+proEsc(proUpiId())+'</b></div>'+
-        '<a href="'+proUpiLink(o.total,o.id,'phonepe')+'" style="display:inline-block;margin:8px 4px 0;background:linear-gradient(90deg,#5f259f,#7b3fc4);color:#fff;padding:11px 18px;border-radius:12px;text-decoration:none;font-weight:900;font-size:12px;">💜 PhonePe ₹'+o.total+'</a>'+
-        '<a href="'+proUpiLink(o.total,o.id)+'" style="display:inline-block;margin:8px 4px 0;background:linear-gradient(90deg,#15a04a,#1fc25e);color:#fff;padding:11px 18px;border-radius:12px;text-decoration:none;font-weight:900;font-size:12px;">📲 अन्य UPI</a></div>'; }
-    }
+    if(paid) payB='<div style="text-align:center;background:#e6f7ed;border:1px solid #a8e6c2;border-radius:12px;padding:10px;margin-top:10px;font-weight:900;color:#0f7a37;font-size:12.5px;">✅ RAZORPAY PAID'+(o.payment&&o.payment.ref?('<br><span style="font-size:10px;">Payment ID: '+proEsc(o.payment.ref)+'</span>'):'')+'</div>';
+    else payB='<div style="text-align:center;background:#fff6e0;border:1px solid #ffd970;border-radius:12px;padding:10px;margin-top:10px;font-weight:900;color:#8a6100;font-size:12.5px;">⏳ RAZORPAY PAYMENT VERIFICATION PENDING<br><span style="font-size:10px;">Admin Razorpay Dashboard से verify करेंगे।</span></div>';
     var rows=(o.items||[]).map(rowFn).join('')||'<div style="color:#999;">—</div>';
     var stamp='<div style="display:inline-block;border:2.5px solid #c62828;color:#c62828;border-radius:8px;padding:5px 12px;font-size:9.5px;font-weight:900;letter-spacing:1.5px;text-align:center;line-height:1.5;">✓ AUTHORISED<br>SEWAASTRA STEEL<br>PVT LTD</div>';
     document.getElementById('proBillInner').innerHTML=
@@ -6083,7 +6070,7 @@ var LGS=[['hi','हिन्दी'],['en','English']];
         '</div>'+
       '</div>';
     m.classList.add('open');
-    try{ if(!paid&&!isCash&&typeof proMakeQR==='function'){ var qb=document.getElementById('proQrBox'); if(qb) proMakeQR(qb, proUpiLink(o.total,o.id)); } }catch(e){}
+    /* Razorpay-only billing: no manual UPI QR is rendered here. */
   }
   var _pB=window.proShowBill;
   window.proShowBill=function(oid,thenRate){
@@ -7236,9 +7223,9 @@ try{ var h=document.getElementById('swDotH'); }catch(e){} try{ var __nt=Date.now
    - Firebase Spark: order/user data writes go directly to Firestore.
    - Razorpay: the browser only receives the public Key ID.
    - A server-created Razorpay order_id is required before opening Checkout.
-     The optional endpoint must keep the Razorpay Secret on the server.
-   - If the endpoint is not configured, the existing manual UPI flow remains
-     available so a Spark-only deployment can still save bookings in Firestore.
+     The endpoint must keep the Razorpay Secret on the server.
+   - There is no Cash, Manual UPI, or order-without-payment fallback.
+     If the endpoint is missing, checkout stops and no order is saved.
 */
 try {
 (function () {
@@ -7250,8 +7237,6 @@ try {
   window.SW_RAZORPAY_KEY_ID = window.SW_RAZORPAY_KEY_ID || 'rzp_test_TfTNHTZ21d4UtB';
   /* Set to an HTTPS server endpoint when Razorpay Orders API is deployed. */
   window.SW_RAZORPAY_ORDER_ENDPOINT = window.SW_RAZORPAY_ORDER_ENDPOINT || '';
-
-  var legacyPayment = (typeof window.proOpenPayment === 'function') ? window.proOpenPayment : null;
 
   function authUser() {
     try { return firebase.auth().currentUser || null; } catch (e) { return null; }
@@ -7335,19 +7320,11 @@ try {
     });
   }
 
-  function manualFallback(amount, onDone, onCancel) {
-    showToast('Razorpay secure order endpoint नहीं मिला — Manual UPI fallback खुल रहा है');
-    if (legacyPayment) {
-      legacyPayment(amount, function (ref) {
-        onDone({
-          method: 'UPI', gateway: 'Manual UPI', status: 'Payment Verifying',
-          verified: false, verification: 'pending_admin_verification',
-          ref: String(ref || ''), paidAt: Date.now()
-        });
-      });
-      return;
-    }
-    showAlert('Payment setup अधूरा है', 'Razorpay Order API endpoint configure करें या Manual UPI setup जोड़ें।');
+  function razorpaySetupRequired(onCancel) {
+    showAlert(
+      'Razorpay setup अधूरा है',
+      'Secure Razorpay Order API endpoint configure किए बिना payment शुरू नहीं हो सकती। Cash और Manual UPI बंद हैं।'
+    );
     if (onCancel) onCancel();
   }
 
@@ -7359,7 +7336,7 @@ try {
     /* Spark alone cannot hold a Razorpay Secret. Do not open a checkout
        without a real server-created order_id; Razorpay can auto-refund it. */
     if (!endpoint) {
-      manualFallback(amount, onDone, onCancel);
+      razorpaySetupRequired(onCancel);
       return;
     }
 
@@ -7457,6 +7434,8 @@ try {
     try {
       var u = authUser();
       if (!u) return showAlert('Login ज़रूरी है', 'Firebase में booking save करने के लिए पहले login करें।');
+      /* Payment mode is fixed: Razorpay only. */
+      selectedMode = 'Online';
       var extraEl = document.getElementById('proAddrExtra');
       var areaEl = document.getElementById('manualAddr');
       var address = ((extraEl && extraEl.value.trim()) ? extraEl.value.trim() + ', ' : '') + ((areaEl && areaEl.value) || '').trim();
@@ -7466,7 +7445,7 @@ try {
       var remark = ((document.getElementById('cartRemark') || {}).value || '').trim();
       var maps = ((document.getElementById('googleMapsLink') || {}).value || '');
       if (!address) return showAlert('पता आवश्यक है', 'कृपया अपनी डिलीवरी लोकेशन या पता दर्ज करें');
-      if (!selectedMode) return showAlert('भुगतान मोड चुनें', 'कृपया Cash या Razorpay / Online चुनें');
+      if (selectedMode !== 'Online') return showAlert('Razorpay payment ज़रूरी है', 'Booking के लिए Razorpay से payment करें।');
       if (!cart || !cart.length) return showAlert('कार्ट खाली है', 'पहले कोई सेवा जोड़ें');
 
       var subtotal = cart.reduce(function (sum, item) {
@@ -7509,7 +7488,13 @@ try {
         };
 
         function saveOrder(payment) {
-          order.payment = payment || { method: 'Cash', status: 'Pay after service', verified: false, cash: true };
+          order.payment = payment || {
+            method: 'Razorpay',
+            gateway: 'Razorpay',
+            status: 'Payment Verifying',
+            verified: false,
+            verification: 'pending_server_verification'
+          };
           showLoader('Firebase Spark में order save हो रहा है...');
           return SWOrder.place(order).then(function (savedId) {
             order.id = savedId || order.id;
@@ -7525,8 +7510,6 @@ try {
               var paymentLine = '';
               if (order.payment && order.payment.gateway === 'Razorpay') {
                 paymentLine = '<br>💳 Razorpay Payment ID: <b>' + proEsc(order.payment.ref || '—') + '</b><br><span style="color:#b07800;font-weight:800;">⏳ Signature server पर verify होने तक payment pending है.</span>';
-              } else if (order.payment && order.payment.method === 'UPI') {
-                paymentLine = '<br><span style="color:#b07800;font-weight:800;">⏳ UPI payment admin verification में है.</span>';
               }
               showAlert('बुकिंग सफल! 🎉', 'आपका ऑर्डर <b>' + proEsc(order.id) + '</b> ☁️ Firebase Spark Firestore में save हो गया है!' + paymentLine + '<br>स्टेटस History में मिलेगा।');
               try { startMyOrdersListener(); } catch (e) {}
@@ -7545,7 +7528,7 @@ try {
             showToast('Payment cancel — order save नहीं हुआ');
           }, oid);
         } else {
-          saveOrder({ method: 'Cash', status: 'Pay after service', verified: false, cash: true });
+          showAlert('Razorpay payment ज़रूरी है', 'Cash और Manual UPI बंद हैं। Razorpay से payment करके ही booking बनेगी।');
         }
       });
     } catch (err) {
@@ -7582,14 +7565,36 @@ try {
     }
   } catch (e) {}
 
+  /* Razorpay-only enforcement: remove any legacy Cash/manual-UPI controls
+     that may still exist in an older cached HTML shell. */
+  selectedMode = 'Online';
+  window.setPayMode = function () {
+    selectedMode = 'Online';
+    var online = document.getElementById('payOnline');
+    if (online) {
+      online.style.borderColor = 'var(--primary)';
+      online.style.background = 'var(--primary-light)';
+      online.innerText = '💳 केवल Razorpay से भुगतान';
+    }
+    var cash = document.getElementById('payCash');
+    if (cash) cash.remove();
+  };
+  window.proOpenPayment = function () {
+    showAlert('Razorpay only', 'Cash और Manual UPI बंद हैं। Razorpay payment checkout से ही भुगतान करें।');
+  };
+  try {
+    var oldCash = document.getElementById('payCash');
+    if (oldCash) oldCash.remove();
+  } catch (e) {}
+
   var note = document.getElementById('paymentPlanNote');
   if (note) {
     note.innerHTML = String(window.SW_RAZORPAY_ORDER_ENDPOINT || '').trim()
-      ? 'Razorpay Test Mode सक्रिय है. Payment के बाद admin verification होगा. Booking Firebase Spark Firestore में save होगी.'
-      : 'Razorpay Key ID जुड़ी है. Secure order endpoint न होने पर Manual UPI fallback खुलेगा; booking Firebase Spark Firestore में save होगी.';
+      ? 'Razorpay Test Mode सक्रिय है. सफल payment के बाद admin verification होगा और booking Firebase Spark Firestore में save होगी.'
+      : 'Razorpay केवल Secure Order API endpoint के साथ चलेगा. Endpoint configure किए बिना booking save नहीं होगी.';
   }
 
-  console.log('%c 💳 RAZORPAY TEST + FIREBASE SPARK MODE ACTIVE ', 'background:#0d6efd;color:#fff;font-weight:bold;padding:4px;');
+  console.log('%c 💳 RAZORPAY ONLY + FIREBASE SPARK MODE ACTIVE ', 'background:#0d6efd;color:#fff;font-weight:bold;padding:4px;');
 })();
 } catch (e) {
   try { console.error('[SewaAstra] Spark/Razorpay bridge error:', e); } catch (_) {}

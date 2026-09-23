@@ -866,7 +866,7 @@ try {
       if (body.payment) body.payment.verified = false;
       if (!body.createdAt) body.createdAt = Date.now();
 
-      return SWDB().collection('orders').doc(oid).create(body)
+      var __doc = SWDB().collection('orders').doc(oid); return (typeof __doc.create === 'function' ? __doc.create(body) : __doc.set(body))
         .then(function () { order.id = oid; return oid; })
         .catch(function (e) {
           // 6 = ALREADY_EXISTS — ID टकरा गई, नई लेकर फिर कोशिश
@@ -935,6 +935,7 @@ const firebaseConfig = {
       firebase.initializeApp(firebaseConfig);
       try{ if(firebase.analytics) firebase.analytics(); }catch(e){}
   }
+  window.RAZORPAY_KEY = "rzp_test_TYb2eg0TLvapOO";
 
   const db = null; /* RTDB unused - removed for speed */
   const firestore = SWDB();
@@ -5570,29 +5571,71 @@ try {
         loc:(typeof userCoords!=='undefined'?{lat:userCoords.lat,lon:userCoords.lon}:null),
         createdAt:Date.now(), timestamp:new Date().toLocaleString('hi-IN')
       };
-      showLoader('ऑर्डर सेव हो रहा है...');
-      SWOrder.place(order).then(function(__id){ oid = __id;
-        hideLoader();
-        /* wallet/coins deduct */
-        try{ wDeduct(oid,swU,coU); }catch(e){}
-        try{
-          var hist=JSON.parse(localStorage.getItem('sw_order_history'))||[]; hist.unshift(order); localStorage.setItem('sw_order_history',JSON.stringify(hist.slice(0,50)));
-        }catch(e){}
-        var waMsg='*🚀 New SewaAstra Booking!*%0A🆔 Order ID: '+oid+'%0A👤 User: '+userMobile+'%0A📦 Items: '+cart.map(function(i){return i.n+' (x'+(i.qty||1)+')';}).join(', ')+'%0A💰 Total: ₹'+finalAmt+' ('+selectedMode+')%0A📍 Address: '+address+'%0A🗺️ Map: '+mapsLink+'%0A📅 '+date+' at '+time+'%0A📝 '+(remark||'None');
-        try{ document.getElementById('fullCartPanel').style.display='none'; }catch(e){}
-        cart=[]; window.cart=cart;
-        try{ document.getElementById('bCount').innerText='0'; }catch(e){}
-        appliedDiscount=0;
-        var extra='';
-        if(selectedMode==='Online'&&CLOUD_CONFIG.upiId){
-          var upi='upi://pay?pa='+encodeURIComponent(CLOUD_CONFIG.upiId)+'&pn=SewaAstra&am='+finalAmt+'&cu=INR&tn='+oid;
-          extra='<br><a href="'+upi+'" style="display:inline-block;margin-top:10px;background:#15a04a;color:#fff;padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:bold;">💳 UPI से ₹'+finalAmt+' Pay करें</a>';
+      function executeOrderSave(paymentData) {
+        order.payment = paymentData || { status: 'Pending', mode: selectedMode, amount: finalAmt };
+        showLoader('ऑर्डर सेव हो रहा है...');
+        SWOrder.place(order).then(function(__id){ oid = __id;
+          hideLoader();
+          /* wallet/coins deduct */
+          try{ wDeduct(oid,swU,coU); }catch(e){}
+          try{
+            var hist=JSON.parse(localStorage.getItem('sw_order_history'))||[]; hist.unshift(order); localStorage.setItem('sw_order_history',JSON.stringify(hist.slice(0,50)));
+          }catch(e){}
+          var waMsg='*🚀 New SewaAstra Booking!*%0A🆔 Order ID: '+oid+'%0A👤 User: '+userMobile+'%0A📦 Items: '+cart.map(function(i){return i.n+' (x'+(i.qty||1)+')';}).join(', ')+'%0A💰 Total: ₹'+finalAmt+' ('+selectedMode+')%0A📍 Address: '+address+'%0A🗺️ Map: '+mapsLink+'%0A📅 '+date+' at '+time+'%0A📝 '+(remark||'None');
+          try{ document.getElementById('fullCartPanel').style.display='none'; }catch(e){}
+          cart=[]; window.cart=cart;
+          try{ document.getElementById('bCount').innerText='0'; }catch(e){}
+          appliedDiscount=0;
+          var payText = (paymentData && paymentData.status === 'PAID') ? '<br><b style="color:#15a04a;">✅ Razorpay भुगतान सफल (Paid)!</b>' : '';
+          var saved='';
+          if(swU||coU) saved='<br><span style="font-size:11px;color:#0d47a1;font-weight:700;">💰 Wallet/Coins से बचत: '+(swU?'SW ₹'+swU+' ':'')+(coU?('Coins ₹'+coV+' ('+coU+' coin)'):'')+'</span>';
+          showAlert('बुकिंग सफल! 🎉','आपका ऑर्डर <b>'+oid+'</b> ☁️ cloud में सेव हो गया है!'+saved+payText+'<br>स्टेटस अपडेट यहीं मिलेंगे।<br><br>💡 पूरा होने पर +₹5 SW wallet में मिलेगा!');
+          try{ window.startMyOrdersListener&&startMyOrdersListener(); }catch(e){}
+        }).catch(function(e){ hideLoader(); showAlert('त्रुटि','ऑर्डर सेव नहीं हो सका: '+e.message); });
+      }
+
+      if (selectedMode === 'Online') {
+        if (typeof Razorpay === 'undefined') {
+          return showAlert('Razorpay लोड हो रहा है', 'कृपया 2 सेकंड रुकें और दोबारा ऑर्डर प्लेस करें।');
         }
-        var saved='';
-        if(swU||coU) saved='<br><span style="font-size:11px;color:#0d47a1;font-weight:700;">💰 Wallet/Coins से बचत: '+(swU?'SW ₹'+swU+' ':'')+(coU?('Coins ₹'+coV+' ('+coU+' coin)'):'')+'</span>';
-        showAlert('बुकिंग सफल! 🎉','आपका ऑर्डर <b>'+oid+'</b> ☁️ cloud में सेव हो गया है!'+saved+'<br>स्टेटस अपडेट यहीं मिलेंगे।'+extra+'<br><br>💡 पूरा होने पर +₹5 SW wallet में मिलेगा!');
-        try{ window.startMyOrdersListener&&startMyOrdersListener(); }catch(e){}
-      }).catch(function(e){ hideLoader(); showAlert('त्रुटि','ऑर्डर सेव नहीं हो सका: '+e.message); });
+        var rzp = new Razorpay({
+          key: window.RAZORPAY_KEY || 'rzp_test_TYb2eg0TLvapOO',
+          amount: Math.round(finalAmt * 100),
+          currency: 'INR',
+          name: 'SewaAstra',
+          description: 'Order #' + oid,
+          image: 'icon-192.png',
+          prefill: {
+            contact: userMobile || '',
+            name: (localStorage.getItem('sw_user_name') || 'Customer')
+          },
+          theme: { color: '#ff6b00' },
+          handler: function(resp) {
+            executeOrderSave({
+              status: 'PAID',
+              mode: 'Razorpay Online',
+              paymentId: resp.razorpay_payment_id || ('RZP_' + Date.now()),
+              amount: finalAmt,
+              paidAt: Date.now(),
+              verified: true
+            });
+          },
+          modal: {
+            ondismiss: function() {
+              hideLoader();
+              showAlert('भुगतान रद्द हुआ', 'आपने Razorpay विंडो बंद कर दी। आप पुनः प्रयास कर सकते हैं या Cash विकल्प चुन सकते हैं।');
+            }
+          }
+        });
+        rzp.open();
+      } else {
+        executeOrderSave({
+          status: 'Pending',
+          mode: 'Cash',
+          amount: finalAmt,
+          verified: false
+        });
+      }
     }catch(e){ showAlert('त्रुटि', e.message); }
   };
   function wDeduct(oid,swU,coU){

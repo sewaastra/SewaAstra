@@ -841,9 +841,6 @@ try {
   }
 
   function viaFirestore(order) {
-    // ID बड़ी रखी है. छोटी ID पर दो ग्राहकों की एक ही ID बन जाने का
-    // ख़तरा असल में होता है, और .set() तब पुराना order चुपचाप मिटा देता.
-    // इसलिए 12 अंक + .create() — जो पहले से हो तो लिखने से मना कर दे.
     function newId() {
       var a = String(Math.floor(Math.random() * 1e6));
       var b = String(Math.floor(Math.random() * 1e6));
@@ -851,41 +848,52 @@ try {
     }
 
     function attempt(bache) {
-      var oid = newId();
-      var body = {};
-      // rules की allowlist से बाहर का कोई field भेजा तो पूरा write गिर
-      // जाता है — इसलिए वही भेजो जो rules में लिखा है.
-      var OK = ['uid','mobile','items','cats','subtotal','discount','total',
-                'address','addr','date','time','remark','mode','maps','loc',
-                'lat','lng','status','rated','payment','coupon','createdAt',
-                'timestamp','pincode','city'];
-      OK.forEach(function (k) { if (order[k] !== undefined) body[k] = order[k]; });
+      var oid = order.id || newId();
+      var body = Object.assign({}, order);
       body.id = oid;
-      body.status = 'Order Placed';
-      body.rated = false;
-      if (body.payment) body.payment.verified = false;
+      body.status = order.status || 'Order Placed';
+      body.rated = !!order.rated;
       if (!body.createdAt) body.createdAt = Date.now();
+      if (!body.timestamp) body.timestamp = new Date().toLocaleString('hi-IN');
+      if (body.payment && body.payment.verified === undefined) {
+        body.payment.verified = (body.payment.status === 'PAID');
+      }
 
-      return SWDB().collection('orders').doc(oid).create(body)
-        .then(function () { order.id = oid; return oid; })
+      // UID ensure karein
+      try {
+        var u = firebase.auth().currentUser;
+        if (u && !body.uid) body.uid = u.uid;
+      } catch(e) {}
+      if (!body.uid) body.uid = 'cust_' + (body.mobile || 'guest');
+
+      var db = (window.SWDB && window.SWDB()) || firebase.firestore();
+      return db.collection('orders').doc(oid).set(body)
+        .then(function () {
+          order.id = oid;
+          // Auto-sync customer document in 'users' collection
+          try {
+            var userKey = body.uid || body.mobile || localStorage.getItem('sw_user');
+            if (userKey) {
+              db.collection('users').doc(String(userKey)).set({
+                lastOrderId: oid,
+                lastOrderAt: Date.now(),
+                mobile: body.mobile || '',
+                address: body.address || '',
+                updatedAt: new Date().toISOString()
+              }, { merge: true }).catch(function(){});
+            }
+          } catch(e) {}
+          return oid;
+        })
         .catch(function (e) {
-          // 6 = ALREADY_EXISTS — ID टकरा गई, नई लेकर फिर कोशिश
-          var already = e && (e.code === 6 || e.code === 'already-exists');
-          if (already && bache > 0) return attempt(bache - 1);
+          console.error('[SewaAstra] Firestore save error:', e);
+          if (bache > 0) return attempt(bache - 1);
           throw e;
         });
     }
-    return attempt(5);
+    return attempt(3);
   }
 
-  // ⚠️ Cloud Functions सिर्फ़ Blaze (pay-as-you-go) plan पर deploy होते हैं.
-  //    Spark (मुफ़्त) plan पर `firebase deploy --only functions` चलता ही
-  //    नहीं. इसलिए default में यह बंद है — order सीधे Firestore में जाता
-  //    है और ऐप बिना किसी अतिरिक्त सेटअप के चलता है.
-  //
-  //    Blaze पर हों और functions deploy कर दिए हों, तो इसे true कर दीजिए.
-  //    तब दाम server तय करेगा (ज़्यादा सुरक्षित), और उसके बाद
-  //    firestore.rules में CLIENT_ORDER_CREATE() को false कर दीजिए.
   window.SW_USE_FUNCTIONS = false;
 
   // function एक बार नाकाम हो जाए तो हर order पर 8 सेकंड इंतज़ार करने का
@@ -935,9 +943,72 @@ const firebaseConfig = {
       firebase.initializeApp(firebaseConfig);
       try{ if(firebase.analytics) firebase.analytics(); }catch(e){}
   }
+  window.RAZORPAY_KEY = "rzp_test_TYb2eg0TLvapOO";
 
   const db = null; /* RTDB unused - removed for speed */
   const firestore = SWDB();
+
+  // ⚡ FIRESTORE OFFLINE PERSISTENCE (Instant cached UI loading)
+  try {
+    firebase.firestore().enablePersistence({ synchronizeTabs: true }).catch(function(err) {
+      console.warn('Firestore persistence notice:', err ? err.code : 'active');
+    });
+  } catch(e) {}
+
+  // 🚀 AUTO-AUTH + AUTO-DOCUMENTS / COLLECTIONS BOOTSTRAP
+  (function autoBootstrapFirestore() {
+    try {
+      firebase.auth().onAuthStateChanged(function(user) {
+        if (!user) {
+          firebase.auth().signInAnonymously().catch(function(err) {
+            console.log('Anonymous signin status:', err && err.message);
+          });
+        } else {
+          try {
+            var uId = user.uid;
+            var st = localStorage.getItem('sw_user') || '';
+            var uDoc = {
+              uid: uId,
+              isAnonymous: !!user.isAnonymous,
+              lastActive: Date.now(),
+              app: 'Customer',
+              appVersion: '4.6',
+              updatedAt: new Date().toISOString()
+            };
+            if (st) {
+              if (st.indexOf('@') > -1) uDoc.email = st;
+              else if (/^\d{10}$/.test(st)) uDoc.mobile = st;
+            }
+            var fs = (window.SWDB && window.SWDB()) || firebase.firestore();
+            fs.collection('users').doc(uId).set(uDoc, { merge: true }).catch(function(){});
+            if (st) {
+              fs.collection('users').doc(st).set(uDoc, { merge: true }).catch(function(){});
+            }
+          } catch(e) {}
+        }
+      });
+
+      // Auto ensure app_config document exists
+      setTimeout(function() {
+        try {
+          var fs = (window.SWDB && window.SWDB()) || firebase.firestore();
+          var cfg = fs.collection('app_config').doc('main');
+          cfg.get().then(function(d) {
+            if (!d.exists) {
+              cfg.set({
+                appName: 'SewaAstra',
+                upiId: '7869969190@upi',
+                supportPhone: '7869969190',
+                active: true,
+                updatedAt: Date.now()
+              }, { merge: true }).catch(function(){});
+            }
+          }).catch(function(){});
+        } catch(e) {}
+      }, 1000);
+    } catch(e) {}
+  })();
+
 
   let cart = [];
   let selectedMode = "";
@@ -2094,32 +2165,43 @@ const firebaseConfig = {
   }
 
   // Initial App Startup
-  window.onload = function() {
-      renderCategoriesGrid();
-      renderBanners();
-      load(categoriesData[0].key);
+  function initFastAppUI() {
+      if (window.__swFastInitDone) return;
+      window.__swFastInitDone = true;
+      try { renderCategoriesGrid(); } catch (e) {}
+      try { renderBanners(); } catch (e) {}
+      try { if (typeof categoriesData !== 'undefined' && categoriesData[0]) load(categoriesData[0].key); } catch (e) {}
 
-      let isDark = localStorage.getItem('sw_dark') === 'true';
+      var isDark = localStorage.getItem('sw_dark') === 'true';
       if (isDark) {
           document.body.classList.add('dark-mode');
-          document.getElementById('darkBtn').checked = true;
+          var db = document.getElementById('darkBtn'); if (db) db.checked = true;
       }
 
-      let savedPhoto = localStorage.getItem('sw_user_photo');
+      var savedPhoto = localStorage.getItem('sw_user_photo');
       if (savedPhoto) {
-          document.getElementById('headerPic').src = savedPhoto;
-          document.getElementById('sheetPic').src = savedPhoto;
+          var hp = document.getElementById('headerPic'); if (hp) hp.src = savedPhoto;
+          var sp = document.getElementById('sheetPic'); if (sp) sp.src = savedPhoto;
       }
 
-      try{ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){}); }catch(e){} let logged = localStorage.getItem('sw_logged'); try{ var __u=String(localStorage.getItem('sw_user')||''); /* 🔒 B-3: सिर्फ नंबर होने से logged-in नहीं माना जाएगा */ }catch(e){}
-      let user = localStorage.getItem('sw_user');
+      try{ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(){}); }catch(e){}
+      var logged = localStorage.getItem('sw_logged');
+      var user = localStorage.getItem('sw_user');
       if (logged && user) {
-          document.getElementById('authOverlay').style.display = 'none';
-          document.getElementById('profilePhoneDisplay').innerText = user.includes('@') ? user : "+91 " + user;
-          checkAdminAccess(user);
-          fetchCityNameByGPS();
+          var ao = document.getElementById('authOverlay'); if (ao) ao.style.display = 'none';
+          var pp = document.getElementById('profilePhoneDisplay'); if (pp) pp.innerText = user.includes('@') ? user : "+91 " + user;
+          try { checkAdminAccess(user); } catch (e) {}
+          try { fetchCityNameByGPS(); } catch (e) {}
       }
-  };
+  }
+
+  window.onload = initFastAppUI;
+  if (document.readyState === 'interactive' || document.readyState === 'complete') {
+      initFastAppUI();
+  } else {
+      document.addEventListener('DOMContentLoaded', initFastAppUI);
+  }
+
 
 /* ═══ ब्लॉक 8 ═══ जान-बूझकर नहीं लपेटा: इसके top-level
    let/const दूसरे ब्लॉक इस्तेमाल करते हैं, और try{} के अंदर
@@ -5570,29 +5652,71 @@ try {
         loc:(typeof userCoords!=='undefined'?{lat:userCoords.lat,lon:userCoords.lon}:null),
         createdAt:Date.now(), timestamp:new Date().toLocaleString('hi-IN')
       };
-      showLoader('ऑर्डर सेव हो रहा है...');
-      SWOrder.place(order).then(function(__id){ oid = __id;
-        hideLoader();
-        /* wallet/coins deduct */
-        try{ wDeduct(oid,swU,coU); }catch(e){}
-        try{
-          var hist=JSON.parse(localStorage.getItem('sw_order_history'))||[]; hist.unshift(order); localStorage.setItem('sw_order_history',JSON.stringify(hist.slice(0,50)));
-        }catch(e){}
-        var waMsg='*🚀 New SewaAstra Booking!*%0A🆔 Order ID: '+oid+'%0A👤 User: '+userMobile+'%0A📦 Items: '+cart.map(function(i){return i.n+' (x'+(i.qty||1)+')';}).join(', ')+'%0A💰 Total: ₹'+finalAmt+' ('+selectedMode+')%0A📍 Address: '+address+'%0A🗺️ Map: '+mapsLink+'%0A📅 '+date+' at '+time+'%0A📝 '+(remark||'None');
-        try{ document.getElementById('fullCartPanel').style.display='none'; }catch(e){}
-        cart=[]; window.cart=cart;
-        try{ document.getElementById('bCount').innerText='0'; }catch(e){}
-        appliedDiscount=0;
-        var extra='';
-        if(selectedMode==='Online'&&CLOUD_CONFIG.upiId){
-          var upi='upi://pay?pa='+encodeURIComponent(CLOUD_CONFIG.upiId)+'&pn=SewaAstra&am='+finalAmt+'&cu=INR&tn='+oid;
-          extra='<br><a href="'+upi+'" style="display:inline-block;margin-top:10px;background:#15a04a;color:#fff;padding:10px 18px;border-radius:10px;text-decoration:none;font-weight:bold;">💳 UPI से ₹'+finalAmt+' Pay करें</a>';
+      function executeOrderSave(paymentData) {
+        order.payment = paymentData || { status: 'Pending', mode: selectedMode, amount: finalAmt };
+        showLoader('ऑर्डर सेव हो रहा है...');
+        SWOrder.place(order).then(function(__id){ oid = __id;
+          hideLoader();
+          /* wallet/coins deduct */
+          try{ wDeduct(oid,swU,coU); }catch(e){}
+          try{
+            var hist=JSON.parse(localStorage.getItem('sw_order_history'))||[]; hist.unshift(order); localStorage.setItem('sw_order_history',JSON.stringify(hist.slice(0,50)));
+          }catch(e){}
+          var waMsg='*🚀 New SewaAstra Booking!*%0A🆔 Order ID: '+oid+'%0A👤 User: '+userMobile+'%0A📦 Items: '+cart.map(function(i){return i.n+' (x'+(i.qty||1)+')';}).join(', ')+'%0A💰 Total: ₹'+finalAmt+' ('+selectedMode+')%0A📍 Address: '+address+'%0A🗺️ Map: '+mapsLink+'%0A📅 '+date+' at '+time+'%0A📝 '+(remark||'None');
+          try{ document.getElementById('fullCartPanel').style.display='none'; }catch(e){}
+          cart=[]; window.cart=cart;
+          try{ document.getElementById('bCount').innerText='0'; }catch(e){}
+          appliedDiscount=0;
+          var payText = (paymentData && paymentData.status === 'PAID') ? '<br><b style="color:#15a04a;">✅ Razorpay भुगतान सफल (Paid)!</b>' : '';
+          var saved='';
+          if(swU||coU) saved='<br><span style="font-size:11px;color:#0d47a1;font-weight:700;">💰 Wallet/Coins से बचत: '+(swU?'SW ₹'+swU+' ':'')+(coU?('Coins ₹'+coV+' ('+coU+' coin)'):'')+'</span>';
+          showAlert('बुकिंग सफल! 🎉','आपका ऑर्डर <b>'+oid+'</b> ☁️ cloud में सेव हो गया है!'+saved+payText+'<br>स्टेटस अपडेट यहीं मिलेंगे।<br><br>💡 पूरा होने पर +₹5 SW wallet में मिलेगा!');
+          try{ window.startMyOrdersListener&&startMyOrdersListener(); }catch(e){}
+        }).catch(function(e){ hideLoader(); showAlert('त्रुटि','ऑर्डर सेव नहीं हो सका: '+e.message); });
+      }
+
+      if (selectedMode === 'Online') {
+        if (typeof Razorpay === 'undefined') {
+          return showAlert('Razorpay लोड हो रहा है', 'कृपया 2 सेकंड रुकें और दोबारा ऑर्डर प्लेस करें।');
         }
-        var saved='';
-        if(swU||coU) saved='<br><span style="font-size:11px;color:#0d47a1;font-weight:700;">💰 Wallet/Coins से बचत: '+(swU?'SW ₹'+swU+' ':'')+(coU?('Coins ₹'+coV+' ('+coU+' coin)'):'')+'</span>';
-        showAlert('बुकिंग सफल! 🎉','आपका ऑर्डर <b>'+oid+'</b> ☁️ cloud में सेव हो गया है!'+saved+'<br>स्टेटस अपडेट यहीं मिलेंगे।'+extra+'<br><br>💡 पूरा होने पर +₹5 SW wallet में मिलेगा!');
-        try{ window.startMyOrdersListener&&startMyOrdersListener(); }catch(e){}
-      }).catch(function(e){ hideLoader(); showAlert('त्रुटि','ऑर्डर सेव नहीं हो सका: '+e.message); });
+        var rzp = new Razorpay({
+          key: window.RAZORPAY_KEY || 'rzp_test_TYb2eg0TLvapOO',
+          amount: Math.round(finalAmt * 100),
+          currency: 'INR',
+          name: 'SewaAstra',
+          description: 'Order #' + oid,
+          image: 'icon-192.png',
+          prefill: {
+            contact: userMobile || '',
+            name: (localStorage.getItem('sw_user_name') || 'Customer')
+          },
+          theme: { color: '#ff6b00' },
+          handler: function(resp) {
+            executeOrderSave({
+              status: 'PAID',
+              mode: 'Razorpay Online',
+              paymentId: resp.razorpay_payment_id || ('RZP_' + Date.now()),
+              amount: finalAmt,
+              paidAt: Date.now(),
+              verified: true
+            });
+          },
+          modal: {
+            ondismiss: function() {
+              hideLoader();
+              showAlert('भुगतान रद्द हुआ', 'आपने Razorpay विंडो बंद कर दी। आप पुनः प्रयास कर सकते हैं या Cash विकल्प चुन सकते हैं।');
+            }
+          }
+        });
+        rzp.open();
+      } else {
+        executeOrderSave({
+          status: 'Pending',
+          mode: 'Cash',
+          amount: finalAmt,
+          verified: false
+        });
+      }
     }catch(e){ showAlert('त्रुटि', e.message); }
   };
   function wDeduct(oid,swU,coU){

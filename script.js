@@ -841,6 +841,15 @@ try {
   }
 
   function viaFirestore(order) {
+    /* Spark has no trusted server fallback. Never create an order without
+       a real Firebase Auth user; otherwise Firestore rules should reject it. */
+    try {
+      if (!firebase.auth().currentUser) {
+        return Promise.reject(new Error('Firebase login session नहीं मिली. कृपया दोबारा login करें।'));
+      }
+    } catch (e) {
+      return Promise.reject(new Error('Firebase Auth उपलब्ध नहीं है.'));
+    }
     // ID बड़ी रखी है. छोटी ID पर दो ग्राहकों की एक ही ID बन जाने का
     // ख़तरा असल में होता है, और .set() तब पुराना order चुपचाप मिटा देता.
     // इसलिए 12 अंक + .create() — जो पहले से हो तो लिखने से मना कर दे.
@@ -855,9 +864,9 @@ try {
       var body = {};
       // rules की allowlist से बाहर का कोई field भेजा तो पूरा write गिर
       // जाता है — इसलिए वही भेजो जो rules में लिखा है.
-      var OK = ['uid','mobile','items','cats','subtotal','discount','total',
+      var OK = ['id','uid','mobile','items','cats','subtotal','discount','total',
                 'address','addr','date','time','remark','mode','maps','loc',
-                'lat','lng','status','rated','payment','coupon','createdAt',
+                'lat','lng','status','rated','payment','coupon','rewards','createdAt',
                 'timestamp','pincode','city'];
       OK.forEach(function (k) { if (order[k] !== undefined) body[k] = order[k]; });
       body.id = oid;
@@ -886,6 +895,9 @@ try {
   //    Blaze पर हों और functions deploy कर दिए हों, तो इसे true कर दीजिए.
   //    तब दाम server तय करेगा (ज़्यादा सुरक्षित), और उसके बाद
   //    firestore.rules में CLIENT_ORDER_CREATE() को false कर दीजिए.
+  /* Firebase Spark mode: orders are written directly by the signed-in
+     browser to Firestore. Cloud Functions are deliberately not used. */
+  window.SW_SPARK_MODE = true;
   window.SW_USE_FUNCTIONS = false;
 
   // function एक बार नाकाम हो जाए तो हर order पर 8 सेकंड इंतज़ार करने का
@@ -936,8 +948,21 @@ const firebaseConfig = {
       try{ if(firebase.analytics) firebase.analytics(); }catch(e){}
   }
 
+  /* Public Razorpay Key ID. Never place the Razorpay Secret in this file.
+     Set SW_RAZORPAY_ORDER_ENDPOINT only to a trusted HTTPS server endpoint
+     that creates a Razorpay order with the secret key. */
+  window.SW_RAZORPAY_KEY_ID = 'rzp_test_TfTNHTZ21d4UtB';
+  window.SW_RAZORPAY_ORDER_ENDPOINT = window.SW_RAZORPAY_ORDER_ENDPOINT || '';
+
   const db = null; /* RTDB unused - removed for speed */
   const firestore = SWDB();
+  /* Spark-safe local cache; the actual order write still goes to Firestore. */
+  try {
+      firestore.settings({ ignoreUndefinedProperties: true });
+  } catch (e) {}
+  try {
+      firestore.enablePersistence({ synchronizeTabs: true }).catch(function () {});
+  } catch (e) {}
 
   let cart = [];
   let selectedMode = "";
@@ -2912,7 +2937,9 @@ function proSaveProfile(){
     const stored = (localStorage.getItem('sw_user')||'').trim();
     const phone = /^\d{10}$/.test(stored) ? stored : '';
     const email = (u && u.email) || (stored.indexOf('@')>-1 ? stored : '');
-    const key = phone || email;
+    /* Use Auth UID as the primary document key. Phone/email remain as data
+       fields for display and legacy records. */
+    const key = (u && u.uid) || phone || email;
     if(!key) return;
     const data = {
       phone: phone || null,
@@ -5193,10 +5220,11 @@ try {
   function wEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
   function wKey(){
     try{
+      /* Firebase Auth UID first keeps Spark-plan user writes owner-safe. */
+      var u=firebase.auth().currentUser; if(u && u.uid) return u.uid;
       var st=(localStorage.getItem('sw_user')||'').trim();
       if(/^\d{10}$/.test(st)) return st;
       if(st.indexOf('@')>-1) return st;
-      var u=firebase.auth().currentUser; if(u) return u.uid;
       if(st) return st;
     }catch(e){}
     return '';
@@ -5212,7 +5240,11 @@ try {
     try{
       FS.collection('users').doc(k).get().then(function(d){
         var upd={};
-        if(!d.exists){ upd={key:k,kind:'customer',swBal:0,coins:0,refPaid:0,led:[],createdAt:new Date().toLocaleString('en-IN'),ts:Date.now()}; }
+        if(!d.exists){
+          var __au=null; try{ __au=firebase.auth().currentUser; }catch(e){}
+          upd={key:k,kind:'customer',uid:(__au&&__au.uid)||null,swBal:0,coins:0,refPaid:0,led:[],createdAt:new Date().toLocaleString('en-IN'),ts:Date.now()};
+          if(!upd.uid) delete upd.uid;
+        }
         else{
           var x=d.data();
           if(typeof x.swBal!=='number') upd.swBal=0;
@@ -6214,7 +6246,7 @@ try {
   if(window.__c49) return; window.__c49=1;
   var CITIES=['Bhopal','Indore','Gwalior','Jabalpur','Ujjain','Sagar','Dewas','Ratlam','Rewa','Satna','Guna','Hoshangabad','अन्य'];
   function cCity(){ try{ return localStorage.getItem('sw_city')||'Bhopal'; }catch(e){ return 'Bhopal'; } }
-  function cId(m){ try{ var s=(localStorage.getItem('sw_user')||'').trim(); if(/^\d{10}$/.test(s)) return s; if(s.indexOf('@')>-1) return s; var u=firebase.auth().currentUser; if(u) return u.uid; if(s) return s; }catch(e){} return ''; }
+  function cId(m){ try{ var u=firebase.auth().currentUser; if(u&&u.uid) return u.uid; var s=(localStorage.getItem('sw_user')||'').trim(); if(/^\d{10}$/.test(s)) return s; if(s.indexOf('@')>-1) return s; if(s) return s; }catch(e){} return ''; }
   window.cSetCity=function(nm){
     try{ localStorage.setItem('sw_city',nm); }catch(e){}
     var l=document.getElementById('c49Lbl'); if(l) l.innerHTML='🏙️ मेरा शहर (Service): <b style="color:var(--primary);">'+nm+'</b>';
@@ -7199,3 +7231,366 @@ try{ var h=document.getElementById('swDotH'); }catch(e){} try{ var __nt=Date.now
 },3000);
 })();
 } catch (e) { try { console.error('[SewaAstra] ब्लॉक 51 में गड़बड़:', e); (window.__SW_ERRORS = window.__SW_ERRORS || []).push([51, String(e)]); } catch (_) {} }
+
+/* ═══ SPARK + RAZORPAY SAFE BRIDGE v1 ═══
+   - Firebase Spark: order/user data writes go directly to Firestore.
+   - Razorpay: the browser only receives the public Key ID.
+   - A server-created Razorpay order_id is required before opening Checkout.
+     The optional endpoint must keep the Razorpay Secret on the server.
+   - If the endpoint is not configured, the existing manual UPI flow remains
+     available so a Spark-only deployment can still save bookings in Firestore.
+*/
+try {
+(function () {
+  if (window.__swaSparkRazorpay) return;
+  window.__swaSparkRazorpay = true;
+
+  window.SW_SPARK_MODE = true;
+  window.SW_USE_FUNCTIONS = false;
+  window.SW_RAZORPAY_KEY_ID = window.SW_RAZORPAY_KEY_ID || 'rzp_test_TfTNHTZ21d4UtB';
+  /* Set to an HTTPS server endpoint when Razorpay Orders API is deployed. */
+  window.SW_RAZORPAY_ORDER_ENDPOINT = window.SW_RAZORPAY_ORDER_ENDPOINT || '';
+
+  var legacyPayment = (typeof window.proOpenPayment === 'function') ? window.proOpenPayment : null;
+
+  function authUser() {
+    try { return firebase.auth().currentUser || null; } catch (e) { return null; }
+  }
+
+  function authPhone() {
+    try {
+      var u = authUser();
+      if (u && u.phoneNumber) return String(u.phoneNumber);
+      var s = String(localStorage.getItem('sw_user') || '');
+      var d = s.replace(/\D/g, '').slice(-10);
+      return d ? '+91' + d : '';
+    } catch (e) { return ''; }
+  }
+
+  function loadRazorpay() {
+    if (window.Razorpay) return Promise.resolve();
+    return new Promise(function (resolve, reject) {
+      var old = document.querySelector('script[data-swa-razorpay]');
+      if (old) {
+        old.addEventListener('load', resolve, { once: true });
+        old.addEventListener('error', reject, { once: true });
+        return;
+      }
+      var s = document.createElement('script');
+      s.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      s.async = true;
+      s.setAttribute('data-swa-razorpay', '1');
+      s.onload = resolve;
+      s.onerror = function () { reject(new Error('Razorpay Checkout SDK load नहीं हुआ')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function makePaymentMeta(response, orderData) {
+    response = response || {};
+    return {
+      method: 'Razorpay',
+      gateway: 'Razorpay',
+      status: 'Payment Verifying',
+      verified: false,
+      verification: 'pending_server_verification',
+      ref: response.razorpay_payment_id || '',
+      paymentId: response.razorpay_payment_id || '',
+      razorpayPaymentId: response.razorpay_payment_id || '',
+      razorpayOrderId: response.razorpay_order_id || (orderData && (orderData.id || orderData.order_id)) || '',
+      razorpaySignature: response.razorpay_signature || '',
+      keyId: window.SW_RAZORPAY_KEY_ID,
+      amount: Number(orderData && orderData.amount) || 0,
+      currency: (orderData && orderData.currency) || 'INR',
+      paidAt: Date.now()
+    };
+  }
+
+  function serverOrder(amount, receipt) {
+    var endpoint = String(window.SW_RAZORPAY_ORDER_ENDPOINT || '').trim();
+    if (!endpoint) return Promise.resolve(null);
+    var u = authUser();
+    if (!u) return Promise.reject(new Error('Razorpay order बनाने के लिए Firebase login ज़रूरी है।'));
+    return u.getIdToken().then(function (token) {
+      return fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token
+        },
+        body: JSON.stringify({
+          amount: Math.round(Number(amount) * 100),
+          currency: 'INR',
+          receipt: String(receipt || '').slice(0, 40),
+          firebaseUid: u.uid
+        })
+      });
+    }).then(function (res) {
+      return res.json().catch(function () { return {}; }).then(function (data) {
+        if (!res.ok || !data || !(data.id || data.order_id)) {
+          throw new Error((data && (data.error || data.message)) || 'Razorpay order create नहीं हुआ');
+        }
+        return data;
+      });
+    });
+  }
+
+  function manualFallback(amount, onDone, onCancel) {
+    showToast('Razorpay secure order endpoint नहीं मिला — Manual UPI fallback खुल रहा है');
+    if (legacyPayment) {
+      legacyPayment(amount, function (ref) {
+        onDone({
+          method: 'UPI', gateway: 'Manual UPI', status: 'Payment Verifying',
+          verified: false, verification: 'pending_admin_verification',
+          ref: String(ref || ''), paidAt: Date.now()
+        });
+      });
+      return;
+    }
+    showAlert('Payment setup अधूरा है', 'Razorpay Order API endpoint configure करें या Manual UPI setup जोड़ें।');
+    if (onCancel) onCancel();
+  }
+
+  window.swStartRazorpayPayment = function (amount, onDone, onCancel, receipt) {
+    amount = Math.max(1, Math.round(Number(amount) || 0));
+    receipt = receipt || ('SW' + Date.now().toString(36).toUpperCase());
+    var endpoint = String(window.SW_RAZORPAY_ORDER_ENDPOINT || '').trim();
+
+    /* Spark alone cannot hold a Razorpay Secret. Do not open a checkout
+       without a real server-created order_id; Razorpay can auto-refund it. */
+    if (!endpoint) {
+      manualFallback(amount, onDone, onCancel);
+      return;
+    }
+
+    showLoader('Razorpay checkout तैयार हो रहा है...');
+    Promise.all([loadRazorpay(), serverOrder(amount, receipt)]).then(function (parts) {
+      var orderData = parts[1] || {};
+      var orderId = orderData.id || orderData.order_id;
+      if (!window.Razorpay || !orderId) throw new Error('Razorpay order_id नहीं मिला');
+      hideLoader();
+
+      var u = authUser() || {};
+      var options = {
+        key: orderData.key_id || window.SW_RAZORPAY_KEY_ID,
+        amount: Number(orderData.amount) || amount * 100,
+        currency: orderData.currency || 'INR',
+        order_id: orderId,
+        name: 'SewaAstra',
+        description: 'SewaAstra Home Service Booking',
+        image: 'sewaastra.png',
+        handler: function (response) {
+          onDone(makePaymentMeta(response, orderData));
+        },
+        prefill: {
+          name: u.displayName || '',
+          email: u.email || '',
+          contact: authPhone()
+        },
+        notes: { app_order_id: receipt },
+        theme: { color: '#ff6b00' },
+        modal: { ondismiss: function () { if (onCancel) onCancel(); } }
+      };
+      var checkout = new window.Razorpay(options);
+      checkout.on('payment.failed', function (response) {
+        hideLoader();
+        var err = response && response.error ? response.error : {};
+        showAlert('Payment failed', (err.description || 'Razorpay payment पूरा नहीं हुआ।') + '<br>कृपया दोबारा प्रयास करें।');
+        if (onCancel) onCancel();
+      });
+      checkout.open();
+    }).catch(function (err) {
+      hideLoader();
+      showAlert('Razorpay error', (err && err.message) || 'Payment शुरू नहीं हो पाया।');
+      if (onCancel) onCancel();
+    });
+  };
+
+  function ownerDocId() {
+    try {
+      var u = authUser();
+      if (u && u.uid) return u.uid;
+      return String(localStorage.getItem('sw_user') || '').trim();
+    } catch (e) { return ''; }
+  }
+
+  function walletState() {
+    var key = ownerDocId();
+    if (!key || typeof FS === 'undefined') return Promise.resolve({ swBal: 0, coins: 0 });
+    return FS.collection('users').doc(key).get().then(function (snap) {
+      return snap.exists ? (snap.data() || {}) : { swBal: 0, coins: 0 };
+    }).catch(function () { return { swBal: 0, coins: 0 }; });
+  }
+
+  function walletToggles() {
+    var sw = document.getElementById('c44SwT');
+    var co = document.getElementById('c44CoT');
+    return { sw: !sw || sw.checked, coins: !co || co.checked };
+  }
+
+  function currentDiscount() {
+    try { return Math.max(0, Number(appliedDiscount) || 0); } catch (e) {
+      return Math.max(0, Number(window.appliedDiscount) || 0);
+    }
+  }
+
+  function deductWallet(swUse, coinUse, oid) {
+    var key = ownerDocId();
+    if (!key || (!swUse && !coinUse) || typeof FS === 'undefined') return Promise.resolve();
+    var ref = FS.collection('users').doc(key);
+    return FS.runTransaction(function (tx) {
+      return tx.get(ref).then(function (snap) {
+        var data = snap.exists ? (snap.data() || {}) : {};
+        var sw = Math.max(0, (Number(data.swBal) || 0) - swUse);
+        var coins = Math.max(0, (Number(data.coins) || 0) - coinUse);
+        var led = Array.isArray(data.led) ? data.led.slice() : [];
+        if (swUse) led.push({ k: 'sw', amt: -swUse, note: 'Order ' + oid + ' पर wallet use', at: new Date().toLocaleString('en-IN') });
+        if (coinUse) led.push({ k: 'coin', amt: -coinUse, note: 'Order ' + oid + ' पर coins redeem', at: new Date().toLocaleString('en-IN') });
+        tx.set(ref, { uid: (authUser() || {}).uid || null, swBal: sw, coins: coins, led: led.slice(-30) }, { merge: true });
+      });
+    }).catch(function () {});
+  }
+
+  /* Final checkout override: online payment first, then the Spark Firestore
+     write. This supersedes older manual-UPI-only checkout layers above. */
+  window.handleFinalOrder = function () {
+    try {
+      var u = authUser();
+      if (!u) return showAlert('Login ज़रूरी है', 'Firebase में booking save करने के लिए पहले login करें।');
+      var extraEl = document.getElementById('proAddrExtra');
+      var areaEl = document.getElementById('manualAddr');
+      var address = ((extraEl && extraEl.value.trim()) ? extraEl.value.trim() + ', ' : '') + ((areaEl && areaEl.value) || '').trim();
+      var mobile = ((document.getElementById('altMobile') || {}).value || '').trim() || authPhone() || (getIdent ? getIdent() : '');
+      var date = ((document.getElementById('cartDate') || {}).value || '');
+      var time = ((document.getElementById('cartTime') || {}).value || '');
+      var remark = ((document.getElementById('cartRemark') || {}).value || '').trim();
+      var maps = ((document.getElementById('googleMapsLink') || {}).value || '');
+      if (!address) return showAlert('पता आवश्यक है', 'कृपया अपनी डिलीवरी लोकेशन या पता दर्ज करें');
+      if (!selectedMode) return showAlert('भुगतान मोड चुनें', 'कृपया Cash या Razorpay / Online चुनें');
+      if (!cart || !cart.length) return showAlert('कार्ट खाली है', 'पहले कोई सेवा जोड़ें');
+
+      var subtotal = cart.reduce(function (sum, item) {
+        return sum + (Number(item.p) || 0) * (Number(item.qty) || 1);
+      }, 0);
+      var couponDiscount = Math.min(subtotal, currentDiscount());
+      var base = Math.max(0, subtotal - couponDiscount);
+      var toggles = walletToggles();
+
+      walletState().then(function (wallet) {
+        var swUse = toggles.sw ? Math.min(Math.floor(Number(wallet.swBal) || 0), base) : 0;
+        var remaining = Math.max(0, base - swUse);
+        var coinBlocks = toggles.coins ? Math.min(Math.floor((Number(wallet.coins) || 0) / 100), Math.floor(remaining / 10)) : 0;
+        var coinUse = coinBlocks * 100;
+        var coinValue = coinBlocks * 10;
+        var finalAmount = Math.max(10, base + 10 - swUse - coinValue);
+        var oid = 'SW' + Date.now().toString(36).toUpperCase().slice(-8) + Math.floor(Math.random() * 1000);
+        var order = {
+          id: oid,
+          uid: u.uid,
+          mobile: mobile,
+          items: cart.map(function (item) {
+            return { n: item.n, p: Number(item.p) || 0, qty: Number(item.qty) || 1, cat: item.cat || '', catName: item.catName || '', selectedSub: item.selectedSub || '', custom: !!item.custom };
+          }),
+          subtotal: subtotal,
+          discount: couponDiscount,
+          total: finalAmount,
+          address: address,
+          date: date,
+          time: time,
+          remark: remark,
+          mode: selectedMode,
+          maps: maps,
+          rewards: { sw: swUse, coins: coinUse, coinVal: coinValue },
+          status: 'Order Placed',
+          rated: false,
+          loc: (typeof userCoords !== 'undefined') ? { lat: userCoords.lat, lon: userCoords.lon } : null,
+          createdAt: Date.now(),
+          timestamp: new Date().toLocaleString('hi-IN')
+        };
+
+        function saveOrder(payment) {
+          order.payment = payment || { method: 'Cash', status: 'Pay after service', verified: false, cash: true };
+          showLoader('Firebase Spark में order save हो रहा है...');
+          return SWOrder.place(order).then(function (savedId) {
+            order.id = savedId || order.id;
+            return deductWallet(swUse, coinUse, order.id).then(function () {
+              hideLoader();
+              var history = JSON.parse(localStorage.getItem('sw_order_history') || '[]');
+              history.unshift(order);
+              localStorage.setItem('sw_order_history', JSON.stringify(history.slice(0, 50)));
+              try { document.getElementById('fullCartPanel').style.display = 'none'; } catch (e) {}
+              cart = [];
+              try { window.cart = cart; document.getElementById('bCount').innerText = '0'; renderCart(); } catch (e) {}
+              try { appliedDiscount = 0; } catch (e) {}
+              var paymentLine = '';
+              if (order.payment && order.payment.gateway === 'Razorpay') {
+                paymentLine = '<br>💳 Razorpay Payment ID: <b>' + proEsc(order.payment.ref || '—') + '</b><br><span style="color:#b07800;font-weight:800;">⏳ Signature server पर verify होने तक payment pending है.</span>';
+              } else if (order.payment && order.payment.method === 'UPI') {
+                paymentLine = '<br><span style="color:#b07800;font-weight:800;">⏳ UPI payment admin verification में है.</span>';
+              }
+              showAlert('बुकिंग सफल! 🎉', 'आपका ऑर्डर <b>' + proEsc(order.id) + '</b> ☁️ Firebase Spark Firestore में save हो गया है!' + paymentLine + '<br>स्टेटस History में मिलेगा।');
+              try { startMyOrdersListener(); } catch (e) {}
+              try { if (typeof proStartRatingWatcher === 'function') proStartRatingWatcher(); } catch (e) {}
+              return order.id;
+            });
+          }).catch(function (err) {
+            hideLoader();
+            showAlert('Firebase save error', (err && err.message) || 'Order save नहीं हो सका।');
+            throw err;
+          });
+        }
+
+        if (selectedMode === 'Online') {
+          window.swStartRazorpayPayment(finalAmount, saveOrder, function () {
+            showToast('Payment cancel — order save नहीं हुआ');
+          }, oid);
+        } else {
+          saveOrder({ method: 'Cash', status: 'Pay after service', verified: false, cash: true });
+        }
+      });
+    } catch (err) {
+      hideLoader();
+      showAlert('Checkout error', (err && err.message) || 'Checkout शुरू नहीं हो पाया।');
+    }
+  };
+
+  /* Admin confirmation remains manual because Spark has no trusted webhook.
+     In production, replace this with server-side Razorpay signature/webhook verification. */
+  window.adminVerifyPayment = function (oid, ref) {
+    swUi.confirm({
+      icon: '💳',
+      title: 'Razorpay payment verify करें?',
+      msg: 'Razorpay Dashboard में payment ID check करें:\n' + (ref || '—') + '\n\nक्या यह payment सफल है?',
+      ok: '✅ Verify करें',
+      cancel: 'रुकें',
+      onOk: function () {
+        FS.collection('orders').doc(oid).update({
+          'payment.verified': true,
+          'payment.status': 'PAID (Admin Verified)',
+          'payment.verification': 'admin_manual',
+          'payment.verifiedAt': Date.now()
+        }).then(function () { showToast('✅ Razorpay payment verified — ' + oid); })
+          .catch(function (e) { showAlert('त्रुटि', e.message); });
+      }
+    });
+  };
+
+  /* Cloud Functions are unavailable on Spark; skip the automatic claim call. */
+  try {
+    if (window.SWSec && window.SW_SPARK_MODE) {
+      window.SWSec.syncClaims = function () { return window.SWSec.refreshClaims(true); };
+    }
+  } catch (e) {}
+
+  var note = document.getElementById('paymentPlanNote');
+  if (note) {
+    note.innerHTML = String(window.SW_RAZORPAY_ORDER_ENDPOINT || '').trim()
+      ? 'Razorpay Test Mode सक्रिय है. Payment के बाद admin verification होगा. Booking Firebase Spark Firestore में save होगी.'
+      : 'Razorpay Key ID जुड़ी है. Secure order endpoint न होने पर Manual UPI fallback खुलेगा; booking Firebase Spark Firestore में save होगी.';
+  }
+
+  console.log('%c 💳 RAZORPAY TEST + FIREBASE SPARK MODE ACTIVE ', 'background:#0d6efd;color:#fff;font-weight:bold;padding:4px;');
+})();
+} catch (e) {
+  try { console.error('[SewaAstra] Spark/Razorpay bridge error:', e); } catch (_) {}
+}
